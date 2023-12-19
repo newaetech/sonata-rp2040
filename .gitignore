@@ -1,0 +1,6 @@
+.idea
+.vscode
+_deps
+cmake-*
+.DS_Store
+*.pdf
