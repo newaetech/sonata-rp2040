@@ -82,6 +82,7 @@ struct boot_sector {
       uint8_t sys_identifier[8]; // FAT12, FAT16 or FAT32
       uint8_t empty[448];
     };
+    // partially complete FAT32 repr
     struct {
       uint8_t big_sectors_per_fat[4]; // FAT32 only
       uint8_t ext_flags[2];
