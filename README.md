@@ -1,4 +1,4 @@
-# Raspberry Pi Pico SDK Examples
+# RP2040 Firmware for Sonata Board
 
 ## Getting started with CMAKE
 
