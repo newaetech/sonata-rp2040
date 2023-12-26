@@ -48,7 +48,7 @@ tusb_desc_device_t const desc_device =
     .bDeviceProtocol    = 0x00,
     .bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
 
-    .idVendor           = 0xCafe,
+    .idVendor           = 0x2b3e,
     .idProduct          = USB_PID,
     .bcdDevice          = 0x0100,
 
