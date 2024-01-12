@@ -7,7 +7,7 @@
 
 # =============================================================================
 # Project: pico_examples
-# Configurations: Release
+# Configurations: Debug
 # =============================================================================
 # =============================================================================
 
@@ -22,18 +22,18 @@ rule CUSTOM_COMMAND
 #############################################
 # Rule for compiling ASM files.
 
-rule ASM_COMPILER__bs2_default_Release
+rule ASM_COMPILER__bs2_default_Debug
   depfile = $DEP_FILE
   deps = gcc
-  command = C:\PROGRA~1\RASPBE~1\PICOSD~1.1\GCC-AR~1\bin\AR19DD~1.EXE $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
+  command = C:\Users\adewa\code\rppico\gcc-arm-none-eabi\bin\arm-none-eabi-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
   description = Building ASM object $out
 
 
 #############################################
 # Rule for linking ASM executable.
 
-rule ASM_EXECUTABLE_LINKER__bs2_default_Release
-  command = cmd.exe /C "$PRE_LINK && C:\PROGRA~1\RASPBE~1\PICOSD~1.1\GCC-AR~1\bin\AR19DD~1.EXE $FLAGS -Wl,--build-id=none $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD"
+rule ASM_EXECUTABLE_LINKER__bs2_default_Debug
+  command = cmd.exe /C "$PRE_LINK && C:\Users\adewa\code\rppico\gcc-arm-none-eabi\bin\arm-none-eabi-gcc.exe $FLAGS -Wl,--build-id=none $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD"
   description = Linking ASM executable $TARGET_FILE
   restat = $RESTAT
 
@@ -41,38 +41,38 @@ rule ASM_EXECUTABLE_LINKER__bs2_default_Release
 #############################################
 # Rule for compiling ASM files.
 
-rule ASM_COMPILER__usb_msc_Release
+rule ASM_COMPILER__usb_msc_Debug
   depfile = $DEP_FILE
   deps = gcc
-  command = C:\PROGRA~1\RASPBE~1\PICOSD~1.1\GCC-AR~1\bin\AR19DD~1.EXE $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
+  command = C:\Users\adewa\code\rppico\gcc-arm-none-eabi\bin\arm-none-eabi-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
   description = Building ASM object $out
 
 
 #############################################
 # Rule for compiling C files.
 
-rule C_COMPILER__usb_msc_Release
+rule C_COMPILER__usb_msc_Debug
   depfile = $DEP_FILE
   deps = gcc
-  command = C:\PROGRA~1\RASPBE~1\PICOSD~1.1\GCC-AR~1\bin\AR19DD~1.EXE $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  command = C:\Users\adewa\code\rppico\gcc-arm-none-eabi\bin\arm-none-eabi-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
   description = Building C object $out
 
 
 #############################################
 # Rule for compiling CXX files.
 
-rule CXX_COMPILER__usb_msc_Release
+rule CXX_COMPILER__usb_msc_Debug
   depfile = $DEP_FILE
   deps = gcc
-  command = C:\PROGRA~1\RASPBE~1\PICOSD~1.1\GCC-AR~1\bin\AR10B2~1.EXE $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  command = C:\Users\adewa\code\rppico\gcc-arm-none-eabi\bin\arm-none-eabi-g++.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
   description = Building CXX object $out
 
 
 #############################################
 # Rule for linking CXX executable.
 
-rule CXX_EXECUTABLE_LINKER__usb_msc_Release
-  command = cmd.exe /C "$PRE_LINK && C:\PROGRA~1\RASPBE~1\PICOSD~1.1\GCC-AR~1\bin\AR10B2~1.EXE $FLAGS -Wl,--build-id=none $LINK_FLAGS @$RSP_FILE -o $TARGET_FILE  && $POST_BUILD"
+rule CXX_EXECUTABLE_LINKER__usb_msc_Debug
+  command = cmd.exe /C "$PRE_LINK && C:\Users\adewa\code\rppico\gcc-arm-none-eabi\bin\arm-none-eabi-g++.exe $FLAGS -Wl,--build-id=none $LINK_FLAGS @$RSP_FILE -o $TARGET_FILE  && $POST_BUILD"
   description = Linking CXX executable $TARGET_FILE
   rspfile = $RSP_FILE
   rspfile_content = $in $LINK_PATH $LINK_LIBRARIES
@@ -83,7 +83,7 @@ rule CXX_EXECUTABLE_LINKER__usb_msc_Release
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = "C:\Program Files\Raspberry Pi\Pico SDK v1.5.1\cmake\bin\cmake.exe" --regenerate-during-build -SC:\Users\adewa\Documents\Pico-v1.5.1\pico-examples -BC:\Users\adewa\Documents\Pico-v1.5.1\pico-examples\build
+  command = C:\Users\adewa\code\rppico\cmake\bin\cmake.exe --regenerate-during-build -SC:\Users\adewa\code\sonata-rp2040 -BC:\Users\adewa\code\sonata-rp2040\build
   description = Re-running CMake...
   generator = 1
 
@@ -92,7 +92,7 @@ rule RERUN_CMAKE
 # Rule for cleaning all built files.
 
 rule CLEAN
-  command = C:\PROGRA~1\RASPBE~1\PICOSD~1.1\ninja\ninja.exe $FILE_ARG -t clean $TARGETS
+  command = C:\Users\adewa\code\rppico\ninja\ninja.exe $FILE_ARG -t clean $TARGETS
   description = Cleaning all built files...
 
 
@@ -100,6 +100,6 @@ rule CLEAN
 # Rule for printing all primary targets available.
 
 rule HELP
-  command = C:\PROGRA~1\RASPBE~1\PICOSD~1.1\ninja\ninja.exe -t targets
+  command = C:\Users\adewa\code\rppico\ninja\ninja.exe -t targets
   description = All primary targets available:
 

@@ -12,6 +12,14 @@
 #include "pico/stdlib.h"
 #include "bsp/board.h"
 #include "tusb.h"
+#include "hardware/spi.h"
+#include "fpga_program.h"
+
+#define spi_default PICO_DEFAULT_SPI_INSTANCE
+#define FPGA_CONFIG_LED 18
+
+#define STATEA_LED 26
+#define STATEB_LED 25
 
 /* Blink pattern
  * - 250 ms  : device not mounted
@@ -28,15 +36,33 @@ enum  {
 void led_blinking_task(void);
 void dir_fill_req_entries(uint16_t cluster_num, uint16_t parent_cluster);
 
+
 uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
 int main() {
-    const uint LED_PIN = PICO_DEFAULT_LED_PIN;
+    const uint LED_PIN = 24; // LED1
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
 
+    gpio_init(STATEA_LED);
+    gpio_set_dir(STATEA_LED, GPIO_OUT);
+    gpio_init(STATEB_LED);
+    gpio_set_dir(STATEB_LED, GPIO_OUT);
+    gpio_put(25, 0);
+    gpio_put(26, 0);
+
     board_init();
     tud_init(BOARD_TUD_RHPORT);
+    spi_init(spi1, 250E3); //10kHz for now
+
+    gpio_set_function(11, GPIO_FUNC_SPI); // TX pin
+    gpio_set_function(10, GPIO_FUNC_SPI); // CLK pin
+    gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
+
+    gpio_init(FPGA_CONFIG_LED); // LED0 // note should be LED3 at somepoint
+    gpio_set_dir(FPGA_CONFIG_LED, GPIO_OUT);
+
+    FPGA_DONE_PIN_SETUP();
 
     dir_fill_req_entries(3, 0);
     dir_fill_req_entries(4, 0);
@@ -45,6 +71,11 @@ int main() {
     while (true) {
         tud_task(); // tinyusb device task
         led_blinking_task();
+        if (!FPGA_ISDONE()) {
+          gpio_put(FPGA_CONFIG_LED, 0);
+        } else {
+          gpio_put(FPGA_CONFIG_LED, 1);
+        }
     }
 }
 

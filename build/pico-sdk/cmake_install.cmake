@@ -1,4 +1,4 @@
-# Install script for directory: C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk
+# Install script for directory: C:/Users/adewa/code/rppico/pico-sdk
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -12,7 +12,7 @@ if(NOT DEFINED CMAKE_INSTALL_CONFIG_NAME)
     string(REGEX REPLACE "^[^A-Za-z0-9_]+" ""
            CMAKE_INSTALL_CONFIG_NAME "${BUILD_TYPE}")
   else()
-    set(CMAKE_INSTALL_CONFIG_NAME "Release")
+    set(CMAKE_INSTALL_CONFIG_NAME "Debug")
   endif()
   message(STATUS "Install configuration: \"${CMAKE_INSTALL_CONFIG_NAME}\"")
 endif()
@@ -34,15 +34,15 @@ endif()
 
 # Set default install directory permissions.
 if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/bin/arm-none-eabi-objdump.exe")
+  set(CMAKE_OBJDUMP "C:/Users/adewa/code/rppico/gcc-arm-none-eabi/bin/arm-none-eabi-objdump.exe")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("C:/Users/adewa/Documents/Pico-v1.5.1/pico-examples/build/pico-sdk/tools/cmake_install.cmake")
-  include("C:/Users/adewa/Documents/Pico-v1.5.1/pico-examples/build/pico-sdk/src/cmake_install.cmake")
-  include("C:/Users/adewa/Documents/Pico-v1.5.1/pico-examples/build/pico_extras/src/cmake_install.cmake")
-  include("C:/Users/adewa/Documents/Pico-v1.5.1/pico-examples/build/pico-sdk/docs/cmake_install.cmake")
+  include("C:/Users/adewa/code/sonata-rp2040/build/pico-sdk/tools/cmake_install.cmake")
+  include("C:/Users/adewa/code/sonata-rp2040/build/pico-sdk/src/cmake_install.cmake")
+  include("C:/Users/adewa/code/sonata-rp2040/build/pico_extras/src/cmake_install.cmake")
+  include("C:/Users/adewa/code/sonata-rp2040/build/pico-sdk/docs/cmake_install.cmake")
 
 endif()
 
