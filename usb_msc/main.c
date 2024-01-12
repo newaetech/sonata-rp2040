@@ -53,7 +53,7 @@ int main() {
 
     board_init();
     tud_init(BOARD_TUD_RHPORT);
-    spi_init(spi1, 250E3); //10kHz for now
+    spi_init(spi1, 250E3); //Min speed seems to be ~100kHz, below that USB gets angry
 
     gpio_set_function(11, GPIO_FUNC_SPI); // TX pin
     gpio_set_function(10, GPIO_FUNC_SPI); // CLK pin

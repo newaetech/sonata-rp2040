@@ -173,30 +173,31 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
                     FPGA_PROG_BYTES_LEFT = BE_4U8_TO_U32(buffer + header_end_loc - 4);
                     FPGA_PROG_BYTES_LEFT += header_end_loc; // TODO: check this shouldn't be +1 or -1 or something
-                    // fpga_dma = dma_claim_unused_channel(true);
-                    // fpga_dma_config = dma_channel_get_default_config(fpga_dma);
+                    fpga_dma = dma_claim_unused_channel(true);
+                    fpga_dma_config = dma_channel_get_default_config(fpga_dma);
 
-                    // channel_config_set_transfer_data_size(&fpga_dma_config, DMA_SIZE_8);
-                    // channel_config_set_dreq(&fpga_dma_config, spi_get_dreq(spi1, true));
-                    // channel_config_set_write_increment(&fpga_dma_config, true);
+                    channel_config_set_transfer_data_size(&fpga_dma_config, DMA_SIZE_8);
+                    channel_config_set_dreq(&fpga_dma_config, spi_get_dreq(spi1, true));
+                    channel_config_set_write_increment(&fpga_dma_config, false);
+                    channel_config_set_read_increment(&fpga_dma_config, true);
                     FPGA_ERASED = 0;
 
                 }
             }
             if (is_cluster_in_chain(bitstream_start_cluster, sector_to_cluster(lba))) {
-                gpio_put(26, led_state_a); // blink every time we get here
-                led_state_a ^= 1;
                 if (FPGA_PROG_BYTES_LEFT) {
-                    // if (dma_channel_is_busy(fpga_dma)) {
-                    //     return 0;
-                    // } else {
+                    if (dma_channel_is_busy(fpga_dma)) {
+                        return 0;
+                    } else {
+                        gpio_put(26, led_state_a); // blink every time we get here
+                        led_state_a ^= 1;
                         // start transfer
-                        // bufsize = min(bufsize, sizeof(FPGA_WRITE_BUF));
+                        bufsize = min(bufsize, sizeof(FPGA_WRITE_BUF));
                         bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
-                        // memcpy(FPGA_WRITE_BUF, buffer, bufsize);
-                        // dma_channel_configure(fpga_dma, &fpga_dma_config, &spi_get_hw(spi1)->dr,
-                        //     FPGA_WRITE_BUF, bufsize, true);
-                        spi_write_blocking(spi1, buffer, bufsize);
+                        memcpy(FPGA_WRITE_BUF, buffer, bufsize);
+                        dma_channel_configure(fpga_dma, &fpga_dma_config, &spi_get_hw(spi1)->dr,
+                            FPGA_WRITE_BUF, bufsize, true);
+                        // spi_write_blocking(spi1, buffer, bufsize);
                         // for (uint32_t i = 0; i < bufsize; i++) {
                         //     fpga_program_sendbyte(buffer[i]);
                         // }
@@ -205,81 +206,13 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                             FPGA_PROG_IN_PROCESS = 0;
                         }
                         // return bufsize;
-                    // }
+                    }
                 }
             }
         }
     }
     if (lba >= DISK_REAL_SECTOR_NUM)
         return bufsize; // fake it
-    // if (sector_to_cluster(lba) > 5000) { // hack for now
-    //     blink_interval_ms = 100;
-    //     if (fpga_dma >= 0) {
-    //         if (dma_channel_is_busy(fpga_dma)) {
-    //             return 0;
-    //         }
-    //     }
-    //     if (!FPGA_PROG_IN_PROCESS) {
-    //         // set NPROG low to erase
-    //         led_state_a ^= 1;
-    //         gpio_put(26, led_state_a); // blink every time we get here
-
-    //         FPGA_PROG_IN_PROCESS = 1;
-    //         fpga_program_setup1();
-    //         FPGA_ERASED_START = board_millis();
-    //         return 0;
-    //     } else if (FPGA_ERASED_START) { // quick and dirty hack, fix later
-    //         // return 0 (busy) until 250ms have passed
-    //         if ((board_millis() - FPGA_ERASED_START) < 250) {
-    //             return 0;
-    //         } else {
-    //             gpio_put(25, 1);
-    //             fpga_program_setup2();
-    //             FPGA_ERASED_START = 0;
-    //             // note hack to find bistream length to program:
-    //             // bitstream will have 32 FF's in a row - length is right before this.
-    //             // doesn't include header length as well, so will need to add that length back in
-    //             uint16_t header_end_loc = 0;
-    //             uint8_t match_pattern[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    //             for (; header_end_loc < (bufsize - sizeof(match_pattern)); header_end_loc++) {
-    //                 if (buffer[header_end_loc] != 0xFF)
-    //                     continue;
-    //                 if (!memcmp(buffer + header_end_loc, match_pattern, sizeof(match_pattern)))
-    //                     break; // found
-    //             }
-    //             FPGA_PROG_BYTES_LEFT = LE_4U8_TO_U32(buffer + header_end_loc - 4);
-    //             FPGA_PROG_BYTES_LEFT += header_end_loc; // TODO: check this shouldn't be +1 or -1 or something
-    //             fpga_dma = dma_claim_unused_channel(true);
-    //             fpga_dma_config = dma_channel_get_default_config(fpga_dma);
-    //             channel_config_set_transfer_data_size(&fpga_dma_config, DMA_SIZE_8);
-    //             channel_config_set_dreq(&fpga_dma_config, spi_get_dreq(spi1, true));
-    //             channel_config_set_write_increment(&fpga_dma_config, true);
-    //         }
-    //     }
-
-    //     if (FPGA_PROG_BYTES_LEFT) {
-    //         if (dma_channel_is_busy(fpga_dma)) {
-    //             return 0;
-    //         } else {
-    //             // start transfer
-    //             bufsize = min(bufsize, sizeof(FPGA_WRITE_BUF));
-    //             bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
-    //             memcpy(FPGA_WRITE_BUF, buffer, bufsize);
-    //             dma_channel_configure(fpga_dma, &fpga_dma_config, &spi_get_hw(spi1)->dr,
-    //                 FPGA_WRITE_BUF, bufsize, true);
-    //             FPGA_PROG_BYTES_LEFT -= bufsize;
-    //             if (!FPGA_PROG_BYTES_LEFT) {
-    //                 FPGA_PROG_IN_PROCESS = 0;
-    //             }
-    //             return bufsize;
-    //         }
-    //     }
-    // } else {
-    //     uint8_t *addr = FILESYSTEM.raw_sectors[lba] + offset;
-    //     memcpy(addr, buffer, bufsize);
-    //     return bufsize;
-
-    // }
     struct fat_filesystem *fs = get_filesystem();
     uint8_t *addr = fs->raw_sectors[lba] + offset;
     memcpy(addr, buffer, bufsize);
