@@ -153,7 +153,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                     FPGA_ERASED_START = board_millis(); // get start of erase time
                     return 0; // busy
                 } else if (FPGA_ERASED_START) {
-                    if ((board_millis() - FPGA_ERASED_START) < 250) {
+                    if ((board_millis() - FPGA_ERASED_START) < 100) {
                         return 0; // still waiting on erase
                     } else {
                         FPGA_ERASED = 1;

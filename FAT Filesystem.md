@@ -231,3 +231,7 @@ same use on Linux.
 
 If these tools talk about the sectors where your subdirectories are being reclaimed or free, one cause
 can be that these folders are missing the `'.'` and `'..'` subdirectories.
+
+### Useful Links
+
+https://averstak.tripod.com/fatdox/00dindex.htm
