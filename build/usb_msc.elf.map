@@ -1545,9 +1545,9 @@ Discarded input sections
                 0x00000000       0xac usb_msc/CMakeFiles/usb_msc.dir/C_/Users/adewa/code/rppico/pico-sdk/src/rp2_common/hardware_dma/dma.c.obj
  .bss._timer_claimed
                 0x00000000        0x1 usb_msc/CMakeFiles/usb_msc.dir/C_/Users/adewa/code/rppico/pico-sdk/src/rp2_common/hardware_dma/dma.c.obj
- .text          0x00000000        0x0 C:\Users\adewa\AppData\Local\Temp\ccQGg9US.o
- .data          0x00000000        0x0 C:\Users\adewa\AppData\Local\Temp\ccQGg9US.o
- .bss           0x00000000        0x0 C:\Users\adewa\AppData\Local\Temp\ccQGg9US.o
+ .text          0x00000000        0x0 C:\Users\adewa\AppData\Local\Temp\ccckcTDc.o
+ .data          0x00000000        0x0 C:\Users\adewa\AppData\Local\Temp\ccckcTDc.o
+ .bss           0x00000000        0x0 C:\Users\adewa\AppData\Local\Temp\ccckcTDc.o
  .data          0x00000000        0x0 c:/users/adewa/code/rppico/gcc-arm-none-eabi/bin/../lib/gcc/arm-none-eabi/10.3.1/thumb/v6-m/nofp\libgcc.a(_dvmd_tls.o)
  .bss           0x00000000        0x0 c:/users/adewa/code/rppico/gcc-arm-none-eabi/bin/../lib/gcc/arm-none-eabi/10.3.1/thumb/v6-m/nofp\libgcc.a(_dvmd_tls.o)
  .text          0x00000000        0x0 c:/users/adewa/code/rppico/gcc-arm-none-eabi/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/thumb/v6-m/nofp\libg.a(lib_a-calloc.o)
@@ -1765,7 +1765,7 @@ LOAD c:/users/adewa/code/rppico/gcc-arm-none-eabi/bin/../lib/gcc/arm-none-eabi/1
 .boot2          0x10000000      0x100
                 0x10000000                __boot2_start__ = .
  *(.boot2)
- .boot2         0x10000000      0x100 C:\Users\adewa\AppData\Local\Temp\ccQGg9US.o
+ .boot2         0x10000000      0x100 C:\Users\adewa\AppData\Local\Temp\ccckcTDc.o
                 0x10000100                __boot2_end__ = .
                 0x00000001                ASSERT (((__boot2_end__ - __boot2_start__) == 0x100), ERROR: Pico second stage bootloader must be 256 bytes in size)
 
@@ -3271,7 +3271,7 @@ LOAD usb_msc/CMakeFiles/usb_msc.dir/C_/Users/adewa/code/rppico/pico-sdk/src/rp2_
 LOAD usb_msc/CMakeFiles/usb_msc.dir/C_/Users/adewa/code/rppico/pico-sdk/lib/tinyusb/hw/bsp/rp2040/family.c.obj
 LOAD usb_msc/CMakeFiles/usb_msc.dir/C_/Users/adewa/code/rppico/pico-sdk/src/rp2_common/hardware_spi/spi.c.obj
 LOAD usb_msc/CMakeFiles/usb_msc.dir/C_/Users/adewa/code/rppico/pico-sdk/src/rp2_common/hardware_dma/dma.c.obj
-LOAD C:\Users\adewa\AppData\Local\Temp\ccQGg9US.o
+LOAD C:\Users\adewa\AppData\Local\Temp\ccckcTDc.o
 LOAD c:/users/adewa/code/rppico/gcc-arm-none-eabi/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/thumb/v6-m/nofp\libstdc++.a
 LOAD c:/users/adewa/code/rppico/gcc-arm-none-eabi/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/thumb/v6-m/nofp\libm.a
 START GROUP
@@ -3398,7 +3398,7 @@ LOAD linker stubs
  .ARM.attributes
                 0x0000087e       0x2c usb_msc/CMakeFiles/usb_msc.dir/C_/Users/adewa/code/rppico/pico-sdk/src/rp2_common/hardware_dma/dma.c.obj
  .ARM.attributes
-                0x000008aa       0x22 C:\Users\adewa\AppData\Local\Temp\ccQGg9US.o
+                0x000008aa       0x22 C:\Users\adewa\AppData\Local\Temp\ccckcTDc.o
  .ARM.attributes
                 0x000008cc       0x1e c:/users/adewa/code/rppico/gcc-arm-none-eabi/bin/../lib/gcc/arm-none-eabi/10.3.1/thumb/v6-m/nofp\libgcc.a(_dvmd_tls.o)
  .ARM.attributes

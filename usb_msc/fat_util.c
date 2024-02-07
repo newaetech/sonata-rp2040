@@ -1,4 +1,5 @@
 #include "fat_util.h"
+#include "util.h"
 
 static struct fat_filesystem FILESYSTEM = {
     .boot_sec = {
@@ -29,16 +30,8 @@ static struct fat_filesystem FILESYSTEM = {
                 0xFF, 0xFF, // cluster 2 (README.txt in our case)
                             // 0xFF, 0xFF, // cluster 3 (FPGA folder in our case)
                             // 0xFF, 0xFF, // cluster 4 (SRAM folder in our case)
+            }
             },
-            {
-                0xF8, 0xFF, // 16 bits for FAT ID , 12 for FAT12, etc. (0xFFF8 for partitioned disk)
-                0xFF, 0xFF, // End of chain indicator (reserved cluster?)
-                0xFF, 0xFF, // cluster 2 (README.txt in our case)
-                0xFF, 0xFF, // cluster 2 (README.txt in our case)
-                0xFF, 0xFF, // cluster 2 (README.txt in our case)
-                            // 0xFF, 0xFF, // cluster 3 (FPGA folder in our case)
-                            // 0xFF, 0xFF, // cluster 4 (SRAM folder in our case)
-            }},
     .root_dir = {{.filename = {'T', 'i', 'n', 'y', 'U', 'S', 'B', ' '}, // name
                   .extension = {'0', ' ', ' '},
                   .attribute = 0x08, // volume label

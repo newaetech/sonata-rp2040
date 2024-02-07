@@ -14,12 +14,20 @@
 #include "tusb.h"
 #include "hardware/spi.h"
 #include "fpga_program.h"
+#include "util.h"
 
 #define spi_default PICO_DEFAULT_SPI_INSTANCE
 #define FPGA_CONFIG_LED 18
 
 #define STATEA_LED 26
 #define STATEB_LED 25
+
+#define GPIO_SW0 29
+#define GPIO_SW1 28
+#define GPIO_SW2 27
+
+// TODO
+#define ERR_LED 26
 
 /* Blink pattern
  * - 250 ms  : device not mounted
@@ -36,6 +44,11 @@ enum  {
 void led_blinking_task(void);
 void dir_fill_req_entries(uint16_t cluster_num, uint16_t parent_cluster);
 
+void set_err_led(int on)
+{
+  // TODO
+}
+
 
 uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
@@ -50,6 +63,10 @@ int main() {
     gpio_set_dir(STATEB_LED, GPIO_OUT);
     gpio_put(25, 0);
     gpio_put(26, 0);
+
+    gpio_init(GPIO_SW0); gpio_set_dir(GPIO_SW0, GPIO_IN); gpio_pullup(GPIO_SW0);
+    gpio_init(GPIO_SW1); gpio_set_dir(GPIO_SW1, GPIO_IN); gpio_pullup(GPIO_SW1);
+    gpio_init(GPIO_SW2); gpio_set_dir(GPIO_SW2, GPIO_IN); gpio_pullup(GPIO_SW2);
 
     board_init();
     tud_init(BOARD_TUD_RHPORT);
@@ -67,6 +84,8 @@ int main() {
 
     dir_fill_req_entries(3, 0);
     dir_fill_req_entries(4, 0);
+
+    // check SPI flash?
 
 
     while (true) {

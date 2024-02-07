@@ -10,15 +10,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define min(X, Y) (((X) > (Y)) ? (Y) : (X))
-
-#define U16_TO_2U8(X) ((X) & 0xFF), (((X) >> 8) & 0xFF)
-#define U32_TO_4U8(X) ((X) & 0xFF), (((X) >> 8) & 0xFF), (((X) >> 16) & 0xFF), (((X) >> 24) & 0xFF)
-
-#define LE_4U8_TO_U32(X) ((X)[0] | ((X)[1] << 8) | ((X)[2] << 16) | ((X)[3] << 24))
-#define LE_2U8_TO_U16(X) ((X)[0] | ((X)[1] << 8))
-
-#define BE_4U8_TO_U32(X) ((X)[3] | ((X)[2] << 8) | ((X)[1] << 16) | ((X)[0] << 24))
 enum
 {
     DISK_REAL_CLUSTER_NUM = 0x10,
@@ -39,7 +30,7 @@ static uint32_t cluster_to_sector(uint32_t cluster)
         return 0;
     uint32_t rtn = 0;
     rtn += 1;                   // add boot sector
-    rtn += DISK_SECTOR_PER_FAT; // add FAT
+    rtn += DISK_SECTOR_PER_FAT * NUM_FAT; // add FAT
     rtn += 1;                   // add root directory
     rtn += (cluster - 2) * 4;
     return rtn;
@@ -58,7 +49,8 @@ static uint32_t sector_to_cluster(uint32_t sector)
 // NOTE: keep this under 512 bytes as using multiple blocks is kind of a pain
 #define README_CONTENTS                                            \
     "Place bitstreams in the FPGA folder to only program FPGA\r\n" \
-    "Place bitstreams in the FLASH folder to only program SPI Flash\r\n"
+    "Place bitstreams in the FLASH folder to only program SPI Flash\r\n" \
+    "To reprogram, delete file and resent\r\n"
 
 #pragma pack(push, 1)
 struct boot_sector

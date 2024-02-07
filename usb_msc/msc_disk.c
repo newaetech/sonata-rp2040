@@ -5,15 +5,16 @@
 #include "hardware/spi.h"
 #include "fpga_program.h"
 #include "fat_util.h"
+#include "util.h"
+#include "main.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 
+#define FF_BITSTREAM_LOCATION
+
 
 extern uint32_t blink_interval_ms;
-
-
-// This seems kinda sketch
 
 // Invoked to determine max LUN
 uint8_t tud_msc_get_maxlun_cb(void)
@@ -121,9 +122,6 @@ uint8_t FPGA_PROG_IN_PROCESS = 0;
 uint64_t FPGA_PROG_BYTES_LEFT = 0;
 uint32_t FPGA_ERASED_START = 0;
 
-static volatile uint8_t FPGA_WRITE_BUF[2048];
-dma_channel_config fpga_dma_config;
-int fpga_dma = -1;
 // Callback invoked when received WRITE10 command.
 // Process data in buffer to disk's storage and return number of written bytes
 
@@ -164,48 +162,49 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                 }
 
                 if (FPGA_ERASED) {
-                    uint16_t header_end_loc = 0;
-                    uint8_t match_pattern[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-                    for (; header_end_loc < (bufsize - sizeof(match_pattern)); header_end_loc++) {
-                        if (buffer[header_end_loc] != 0xFF) continue;
-                        if (!memcmp(buffer + header_end_loc, match_pattern, sizeof(match_pattern))) break; // found
+                    // uint16_t header_end_loc = 0;
+                    // uint8_t match_pattern[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+                    // for (; header_end_loc < (bufsize - sizeof(match_pattern)); header_end_loc++) {
+                    //     if (buffer[header_end_loc] != 0xFF) continue;
+                    //     if (!memcmp(buffer + header_end_loc, match_pattern, sizeof(match_pattern))) break; // found
+                    // }
+                    int len_loc = find_bitstream_len_offset(buffer, bufsize);
+                    if (len_loc < 0) {
+                        set_err_led(1);
                     }
+                    return -1;
 
-                    FPGA_PROG_BYTES_LEFT = BE_4U8_TO_U32(buffer + header_end_loc - 4);
+                    FPGA_PROG_BYTES_LEFT = BE_4U8_TO_U32(buffer + len_loc);
                     FPGA_PROG_BYTES_LEFT += header_end_loc; // TODO: check this shouldn't be +1 or -1 or something
-                    fpga_dma = dma_claim_unused_channel(true);
-                    fpga_dma_config = dma_channel_get_default_config(fpga_dma);
-
-                    channel_config_set_transfer_data_size(&fpga_dma_config, DMA_SIZE_8);
-                    channel_config_set_dreq(&fpga_dma_config, spi_get_dreq(spi1, true));
-                    channel_config_set_write_increment(&fpga_dma_config, false);
-                    channel_config_set_read_increment(&fpga_dma_config, true);
+                    fpga_init_dma();
                     FPGA_ERASED = 0;
 
                 }
             }
             if (is_cluster_in_chain(bitstream_start_cluster, sector_to_cluster(lba))) {
                 if (FPGA_PROG_BYTES_LEFT) {
-                    if (dma_channel_is_busy(fpga_dma)) {
-                        return 0;
-                    } else {
+                    if (!is_fpga_dma_ready()) {
                         gpio_put(26, led_state_a); // blink every time we get here
                         led_state_a ^= 1;
                         // start transfer
-                        bufsize = min(bufsize, sizeof(FPGA_WRITE_BUF));
+                        // bufsize = min(bufsize, sizeof(FPGA_WRITE_BUF));
                         bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
-                        memcpy(FPGA_WRITE_BUF, buffer, bufsize);
-                        dma_channel_configure(fpga_dma, &fpga_dma_config, &spi_get_hw(spi1)->dr,
-                            FPGA_WRITE_BUF, bufsize, true);
+                        // memcpy(FPGA_WRITE_BUF, buffer, bufsize);
+                        // dma_channel_configure(fpga_dma, &fpga_dma_config, &spi_get_hw(spi1)->dr,
+                        //     FPGA_WRITE_BUF, bufsize, true);
+
+                        int written_bytes = fpga_send_dma(buffer, bufsize);
                         // spi_write_blocking(spi1, buffer, bufsize);
                         // for (uint32_t i = 0; i < bufsize; i++) {
                         //     fpga_program_sendbyte(buffer[i]);
                         // }
-                        FPGA_PROG_BYTES_LEFT -= bufsize;
+                        FPGA_PROG_BYTES_LEFT -= written_bytes;
                         if (!FPGA_PROG_BYTES_LEFT) {
                             FPGA_PROG_IN_PROCESS = 0;
                         }
                         // return bufsize;
+                    } else {
+                        return 0;
                     }
                 }
             }

@@ -18,6 +18,8 @@
 #define FPGA_DONE_PIN_SETUP() do {gpio_init(FPGA_DONE_PIN); gpio_set_dir(FPGA_DONE_PIN, GPIO_IN);} while(0)
 #define FPGA_ISDONE() gpio_get(FPGA_DONE_PIN)
 
+#define FPGA_BUF_SIZE 512
+
 void fpga_program_sendbyte(uint8_t databyte);
 
 void fpga_program_init(void);
@@ -27,3 +29,11 @@ void fpga_program_setup1(void);
 void fpga_program_setup2(void);
 
 void fpga_program_finish(void);
+
+int find_bitstream_len_offset(uint8_t *bitstream, int len);
+
+int fpga_init_dma(void);
+
+int fpga_send_dma(uint8_t *buf, uint16_t len);
+
+int is_fpga_dma_ready(void);

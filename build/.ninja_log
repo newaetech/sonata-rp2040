@@ -130,3 +130,5 @@
 195	399	7267947043504309	usb_msc/usb_msc.elf	dc194139db82af8c
 27	161	7267947456997050	usb_msc/CMakeFiles/usb_msc.dir/main.c.obj	d6840dd3d9063322
 161	361	7267947458181049	usb_msc/usb_msc.elf	dc194139db82af8c
+26	184	7267963229718506	usb_msc/CMakeFiles/usb_msc.dir/fat_util.c.obj	5f192a692106f2e6
+186	409	7267963231088190	usb_msc/usb_msc.elf	dc194139db82af8c
