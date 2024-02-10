@@ -51,7 +51,7 @@ void fpga_program_finish(void)
     0x000000BB and 0x11220044 are sync words
 
 */
-int find_bitstream_len_offset(uint8_t *bitstream, uint16_len len)
+int find_bitstream_len_offset(uint8_t *bitstream, uint16_t len)
 {
     uint8_t magic_seq[] = {
         0x00, 0x00, 0x00, 0xBB, 0x11, 0x22, 0x00, 0x44

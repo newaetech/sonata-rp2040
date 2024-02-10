@@ -7,6 +7,7 @@ target_sources(usb_msc PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/msc_disk.c
         ${CMAKE_CURRENT_LIST_DIR}/fpga_program.c
         ${CMAKE_CURRENT_LIST_DIR}/fat_util.c
+        ${CMAKE_CURRENT_LIST_DIR}/flash_util.c
         )
 
 target_include_directories(usb_msc PUBLIC

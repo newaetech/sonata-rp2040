@@ -4,6 +4,7 @@
 #include "hardware/dma.h"
 #include "hardware/spi.h"
 #include "fpga_program.h"
+#include "flash_util.h"
 #include "fat_util.h"
 #include "util.h"
 #include "main.h"
@@ -13,6 +14,7 @@
 
 #define FF_BITSTREAM_LOCATION
 
+uint8_t FLASH_READ_BUF[4096];
 
 extern uint32_t blink_interval_ms;
 
@@ -87,19 +89,20 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, boo
 int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize)
 {
     // out of ramdisk
-    if (lba >= DISK_REAL_SECTOR_NUM)
-    {
-        // fake it?
-        memset(buffer, 0x00, bufsize);
-        return (int32_t)bufsize;
-        // return -1;
-        // return -1;
-    }
+    // if (lba >= DISK_REAL_SECTOR_NUM)
+    // {
+    //     // fake it?
+    //     memset(buffer, 0x00, bufsize);
+    //     return (int32_t)bufsize;
+    //     // return -1;
+    //     // return -1;
+    // }
 
-    // uint8_t const* addr = msc_disk0[lba] + offset;
-    struct fat_filesystem *fs = get_filesystem();
-    uint8_t const *addr = fs->raw_sectors[lba] + offset;
-    memcpy(buffer, addr, bufsize);
+    // // uint8_t const* addr = msc_disk0[lba] + offset;
+    // struct fat_filesystem *fs = get_filesystem();
+    // uint8_t const *addr = fs->raw_sectors[lba] + offset;
+    // memcpy(buffer, addr, bufsize);
+    if (spi_flash_read(lba * DISK_SECTOR_SIZE, buffer, bufsize)) return -1;
 
     return (int32_t)bufsize;
 }
@@ -115,9 +118,6 @@ bool tud_msc_is_writable_cb(uint8_t lun)
 #endif
 }
 
-// basic idea:
-//
-
 uint8_t FPGA_PROG_IN_PROCESS = 0;
 uint64_t FPGA_PROG_BYTES_LEFT = 0;
 uint32_t FPGA_ERASED_START = 0;
@@ -130,7 +130,29 @@ uint8_t led_state_b = 0;
 
 uint8_t FPGA_ERASED = 0;
 
+int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
+{
+    if (!bufsize) return 0;
+    if (bufsize > DISK_SECTOR_SIZE) return -1;
+    
 
+    // bitstream_init_spi();
+    if ((offset) || (bufsize != DISK_SECTOR_SIZE)) {
+        if (spi_flash_read((lba * DISK_SECTOR_SIZE), FLASH_READ_BUF, DISK_SECTOR_SIZE)) return -1;
+        memcpy(FLASH_READ_BUF + offset, buffer, bufsize);
+        buffer = FLASH_READ_BUF;
+    }
+
+    if (spi_flash_sector_erase(lba)) return -1;
+
+    for (uint8_t i = 0; i < (bufsize / 256); i++) {
+        if (spi_flash_page_program((lba * DISK_SECTOR_SIZE), buffer + (256 * i))) return -1;
+    }
+
+    return bufsize;
+}
+
+#if 0
 int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
 {
     // out of ramdisk
@@ -217,6 +239,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     memcpy(addr, buffer, bufsize);
     return bufsize;
 }
+#endif
 
 // Callback invoked when received an SCSI command not in built-in list below
 // - READ_CAPACITY10, READ_FORMAT_CAPACITY, INQUIRY, MODE_SENSE6, REQUEST_SENSE

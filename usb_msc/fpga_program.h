@@ -30,10 +30,10 @@ void fpga_program_setup2(void);
 
 void fpga_program_finish(void);
 
-int find_bitstream_len_offset(uint8_t *bitstream, int len);
+int find_bitstream_len_offset(uint8_t *bitstream, uint16_t len);
 
-int fpga_init_dma(void);
+void fpga_init_dma(void);
 
-int fpga_send_dma(uint8_t *buf, uint16_t len);
+int32_t fpga_send_dma(uint8_t *buf, uint16_t len);
 
 int is_fpga_dma_ready(void);
