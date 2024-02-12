@@ -57,8 +57,19 @@ static uint32_t sector_to_cluster(uint32_t sector)
 
 // NOTE: keep this under 512 bytes as using multiple blocks is kind of a pain
 #define README_CONTENTS                                            \
-    "Place bitstreams in the FPGA folder to only program FPGA\r\n" \
-    "Place bitstreams in the FLASH folder to only program SPI Flash\r\n"
+    "See the following notes:\r\n" \
+    "\t1. Copy bitstreams or firmware into this directory to program\r\n" \
+    "\t2. Firmware must be in the Intel hex format\r\n" \
+    "\t3. If the transferred file begins with ':' and the checksum of the first line matches, the file is assumed to be firmware\r\n" \
+    "\t4. Otherwise, if the transferred file contains the magic sequence TDB, it is assumed to be a bitstream\r\n" \
+    "\t5. If neither is true, nothing will be written\r\n" \
+    "\t6. Programming options can be modified by changing options.txt\r\n" \
+    ""
+
+#define OPTIONS_CONTENTS \
+    "PROG_SPI_FLASH=NO\r\n" \
+    "SPI_SPEED_KHZ=5000\r\n" \
+    ""
 
 #pragma pack(push, 1)
 struct boot_sector
