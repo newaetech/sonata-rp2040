@@ -1,4 +1,5 @@
 #include "fat_util.h"
+int is_valid_file(struct directory_entry *entry);
 
 static struct fat_filesystem FILESYSTEM = {
     .boot_sec = {
@@ -22,15 +23,6 @@ static struct fat_filesystem FILESYSTEM = {
         .heads_per_cylinder = {0x02, 0x00},
     },
     .fat = {{
-                0xF8, 0xFF, // 16 bits for FAT ID , 12 for FAT12, etc. (0xFFF8 for partitioned disk)
-                0xFF, 0xFF, // End of chain indicator (reserved cluster?)
-                0xFF, 0xFF, // cluster 2 (README.txt in our case)
-                0xFF, 0xFF, // cluster 2 (README.txt in our case)
-                0xFF, 0xFF, // cluster 2 (README.txt in our case)
-                            // 0xFF, 0xFF, // cluster 3 (FPGA folder in our case)
-                            // 0xFF, 0xFF, // cluster 4 (SRAM folder in our case)
-            },
-            {
                 0xF8, 0xFF, // 16 bits for FAT ID , 12 for FAT12, etc. (0xFFF8 for partitioned disk)
                 0xFF, 0xFF, // End of chain indicator (reserved cluster?)
                 0xFF, 0xFF, // cluster 2 (README.txt in our case)
@@ -147,8 +139,68 @@ uint16_t cluster_to_fat_table_val(uint16_t cluster_num)
     return LE_2U8_TO_U16(FILESYSTEM.fat[0] + cluster_num*2);
 }
 
+
+/*
+    get file information for all files in dir_cluster (0 for root directory)
+
+    stores the info in *files, up to a maximum of max_num_files
+
+    returns the number of files found (up to max_num_files) or negative values for errors
+
+    Does not include the . and .. directories
+*/
+int get_files_in_directory(uint16_t dir_cluster, struct directory_entry *files, uint16_t max_num_files)
+{
+    struct directory_entry *search_dir = NULL;
+    uint16_t max_search = max_num_files;
+    uint16_t file_index = 0;
+    if (dir_cluster < 2) {
+        search_dir = FILESYSTEM.root_dir;
+        max_search = NUM_ROOT_DIR_ENTRIES;
+    } else {
+        search_dir = FILESYSTEM.directories[dir_cluster - 2];
+        max_search = sizeof(FILESYSTEM.directories[0]) / sizeof(FILESYSTEM.directories[0][0]);
+    }
+
+    for (uint16_t i = 0; i < max_search; i++) {
+        if (is_valid_file(search_dir + i)) {
+            memcpy(files + file_index, search_dir + i, sizeof(struct directory_entry));
+            file_index++;
+        }
+
+        if (file_index >= max_num_files)
+            break;
+    }
+
+    return file_index;
+
+}
+
+int is_valid_file(struct directory_entry *entry)
+{
+    // now we need to check the folder for files
+    // these two entries are reserved, so ignore them
+    uint8_t reserved_file0[8] = {'.', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+    uint8_t reserved_file1[8] = {'.', '.', ' ', ' ', ' ', ' ', ' ', ' '};
+    uint8_t null_file[8] = {0}; //empty file entry
+    if (!memcmp(entry->filename, reserved_file0, 8)) return 0; // isn't .
+    if (!memcmp(entry->filename, reserved_file1, 8)) return 0; // isn't ..
+    if (!memcmp(entry->filename, null_file, 8)) return 0; // isn't all null
+    if (!LE_2U8_TO_U16(entry->starting_cluster)) return 0; // cluster 0 isn't valid
+    // if (!LE_4U8_TO_U32(entry->file_size)) return 0; // filesize of 0 isn't valid
+
+    return 1;
+}
+
+int is_folder(struct directory_entry *entry)
+{
+    return (entry->attribute & FAT_DIR_DIRECTORY) == FAT_DIR_DIRECTORY;
+}
+
 /*
     gets the info for the first (non reserved) file or folder in a given folder
+
+    returns 0 for success, -1 if directory is empty
 */
 int get_first_file_in_dir(uint16_t parent_cluster, struct directory_entry *info)
 {
@@ -160,19 +212,16 @@ int get_first_file_in_dir(uint16_t parent_cluster, struct directory_entry *info)
 
     // now we need to check the folder for files
     // these two entries are reserved, so ignore them
-    uint8_t reserved_file0[8] = {'.', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
-    uint8_t reserved_file1[8] = {'.', '.', ' ', ' ', ' ', ' ', ' ', ' '};
-    uint8_t null_file[8] = {0}; //empty file entry
+    // uint8_t reserved_file0[8] = {'.', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+    // uint8_t reserved_file1[8] = {'.', '.', ' ', ' ', ' ', ' ', ' ', ' '};
+    // uint8_t null_file[8] = {0}; //empty file entry
 
     // now parse the entries
     int16_t bitstream_entry = -1;
     for (int16_t i = 0; i < (DISK_SECTOR_SIZE * DISK_SECTOR_PER_CLUSTER) / sizeof(struct directory_entry); i++) {
-        if (!memcmp(folderptr[i].filename, reserved_file0, 8)) continue; // isn't .
-        if (!memcmp(folderptr[i].filename, reserved_file1, 8)) continue; // isn't ..
-        if (!memcmp(folderptr[i].filename, null_file, 8)) continue; // isn't all null
-        if (!LE_2U8_TO_U16(folderptr[i].starting_cluster)) continue; // cluster 0 isn't valid
-        if (!LE_4U8_TO_U32(folderptr[i].file_size)) continue; // filesize of 0 isn't valid
-        if (folderptr[i].attribute & 0x04) continue; // system file...
+        if (!is_valid_file(folderptr + i)) continue;
+        if (folderptr[i].attribute & FAT_DIR_SYSTEM) continue; // system file...
+        if (!LE_4U8_TO_U32(folderptr[i].file_size)) return 0; // filesize of 0 isn't valid
         bitstream_entry = i;
         break;
     }
