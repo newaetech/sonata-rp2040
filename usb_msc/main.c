@@ -73,7 +73,7 @@ int main() {
     gpio_init(GPIO_SW2); gpio_set_dir(GPIO_SW2, GPIO_IN); gpio_pull_up(GPIO_SW2);
 
     board_init();
-    spi_init(spi1, 500E3); //Min speed seems to be ~100kHz, below that USB gets angry
+    spi_init(spi1, 5000E3); //Min speed seems to be ~100kHz, below that USB gets angry
 
     gpio_set_function(11, GPIO_FUNC_SPI); // TX pin
     gpio_set_function(10, GPIO_FUNC_SPI); // CLK pin

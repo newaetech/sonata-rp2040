@@ -48,9 +48,19 @@ static uint32_t sector_to_cluster(uint32_t sector)
 
 // NOTE: keep this under 512 bytes as using multiple blocks is kind of a pain
 #define README_CONTENTS                                            \
-    "Place bitstreams in the FPGA folder to only program FPGA\r\n" \
-    "Place bitstreams in the FLASH folder to only program SPI Flash\r\n" \
-    "To reprogram, delete file and resent\r\n"
+    "See the following notes:\r\n" \
+    "\t1. Copy bitstreams or firmware into this directory to program\r\n" \
+    "\t2. Firmware must be in the Intel hex format\r\n" \
+    "\t3. If the transferred file begins with ':' and the checksum of the first line matches, the file is assumed to be firmware\r\n" \
+    "\t4. Otherwise, if the transferred file contains the magic sequence TDB, it is assumed to be a bitstream\r\n" \
+    "\t5. If neither is true, nothing will be written\r\n" \
+    "\t6. Programming options can be modified by changing options.txt\r\n" \
+    ""
+
+#define OPTIONS_CONTENTS \
+    "PROG_SPI_FLASH=NO\r\n" \
+    "SPI_SPEED_KHZ=5000\r\n" \
+    ""
 
 #pragma pack(push, 1)
 struct boot_sector {
@@ -113,7 +123,10 @@ struct fat_filesystem
                 struct boot_sector boot_sec;
                 // uint8_t boot_sec_raw[DISK_SECTOR_SIZE];
             };
-            uint8_t fat[NUM_FAT][DISK_SECTOR_PER_FAT * DISK_SECTOR_SIZE];
+            union {
+                uint8_t fat[NUM_FAT][DISK_SECTOR_PER_FAT * DISK_SECTOR_SIZE];
+                uint16_t fat16[NUM_FAT][DISK_SECTOR_PER_FAT * DISK_SECTOR_SIZE / 2];
+            };
             // union {
             struct directory_entry root_dir[NUM_ROOT_DIR_ENTRIES];
             // uint8_t root_dir_raw[DISK_SECTOR_SIZE];
@@ -129,9 +142,21 @@ struct fat_filesystem
 };
 
 #pragma pack(pop)
+
+enum fat_directory_bit_flags {
+    FAT_DIR_READ_ONLY = 0x01,
+    FAT_DIR_HIDDEN = 0x02,
+    FAT_DIR_SYSTEM = 0x04,
+    FAT_DIR_VOL_LABEL = 0x08,
+    FAT_DIR_DIRECTORY = 0x10,
+    FAT_DIR_ARCHIVE = 0x20
+};
+
 struct fat_filesystem *get_filesystem(void);
 int32_t get_file_cluster(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename);
 int is_cluster_in_chain(struct fat_filesystem *fs, uint16_t starting_cluster, uint16_t ciq);
 uint16_t cluster_to_fat_table_val(struct fat_filesystem *fs, uint16_t cluster_num);
 int get_first_file_in_dir(struct fat_filesystem *fs, uint16_t parent_cluster, struct directory_entry *info);
 void dir_fill_req_entries(uint16_t cluster_num, uint16_t parent_cluster);
+int get_files_in_directory(uint16_t dir_cluster, struct directory_entry *files, uint16_t max_num_files);
+int is_folder(struct directory_entry *entry);
