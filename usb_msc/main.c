@@ -87,7 +87,7 @@ int main()
     spi_init(spi1, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
     bitstream_init_spi();
 
-    volatile uint16_t dev_id = spi_flash_read_id();
+    // volatile uint16_t dev_id = spi_flash_read_id();
 
     gpio_set_function(11, GPIO_FUNC_SPI); // TX pin
     gpio_set_function(10, GPIO_FUNC_SPI); // CLK pin
@@ -99,7 +99,7 @@ int main()
     FPGA_DONE_PIN_SETUP();
     FPGA_NPROG_SETUP();
 
-    test_spi_flash_prog();
+    // test_spi_flash_prog();
 
 
 
