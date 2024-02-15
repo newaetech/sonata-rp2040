@@ -89,20 +89,20 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, boo
 int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize)
 {
     // out of ramdisk
-    // if (lba >= DISK_REAL_SECTOR_NUM)
-    // {
-    //     // fake it?
-    //     memset(buffer, 0x00, bufsize);
-    //     return (int32_t)bufsize;
-    //     // return -1;
-    //     // return -1;
-    // }
+    if (lba >= DISK_REAL_SECTOR_NUM)
+    {
+        // fake it?
+        memset(buffer, 0x00, bufsize);
+        return (int32_t)bufsize;
+        // return -1;
+        // return -1;
+    }
 
-    // // uint8_t const* addr = msc_disk0[lba] + offset;
-    // struct fat_filesystem *fs = get_filesystem();
-    // uint8_t const *addr = fs->raw_sectors[lba] + offset;
-    // memcpy(buffer, addr, bufsize);
-    if (spi_flash_read(lba * DISK_SECTOR_SIZE, buffer, bufsize)) return -1;
+    // uint8_t const* addr = msc_disk0[lba] + offset;
+    struct fat_filesystem *fs = get_filesystem();
+    uint8_t const *addr = fs->raw_sectors[lba] + offset;
+    memcpy(buffer, addr, bufsize);
+    // if (spi_flash_read(lba * DISK_SECTOR_SIZE, buffer, bufsize)) return -1;
 
     return (int32_t)bufsize;
 }
@@ -129,30 +129,9 @@ uint8_t led_state_a = 0;
 uint8_t led_state_b = 0;
 
 uint8_t FPGA_ERASED = 0;
+uint32_t BITSTREAM_CLUSTER = 0;
 
-int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
-{
-    if (!bufsize) return 0;
-    if (bufsize > DISK_SECTOR_SIZE) return -1;
-    
 
-    // bitstream_init_spi();
-    if ((offset) || (bufsize != DISK_SECTOR_SIZE)) {
-        if (spi_flash_read((lba * DISK_SECTOR_SIZE), FLASH_READ_BUF, DISK_SECTOR_SIZE)) return -1;
-        memcpy(FLASH_READ_BUF + offset, buffer, bufsize);
-        buffer = FLASH_READ_BUF;
-    }
-
-    if (spi_flash_sector_erase(lba)) return -1;
-
-    for (uint8_t i = 0; i < (bufsize / 256); i++) {
-        if (spi_flash_page_program((lba * DISK_SECTOR_SIZE), buffer + (256 * i))) return -1;
-    }
-
-    return bufsize;
-}
-
-#if 0
 int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
 {
     // out of ramdisk
@@ -165,106 +144,41 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     struct directory_entry folder_files[NUM_ROOT_DIR_ENTRIES];
     uint8_t is_reserved_cluster = 0; // should change to "is known file/folder"
 
-    num_root_files = get_files_in_directory(0, root_files, NUM_ROOT_DIR_ENTRIES);
-    if (FPGA_PROG_BYTES_LEFT) {
-        is_reserved_cluster = 1;
-    }
-    if (sector_to_cluster(lba) < 2) {
-        is_reserved_cluster = 1;
-    } else {
-        for (uint16_t i = 0; i < num_root_files; i++) {
-            if (sector_to_cluster(lba) == LE_2U8_TO_U16(root_files[i].starting_cluster)) {
-                is_reserved_cluster = 1;
-                break;
-            }
-            // also check files in folders
-            if (is_folder(root_files + i)) {
-                num_folder_files = get_files_in_directory(LE_2U8_TO_U16(root_files[i].starting_cluster), folder_files, NUM_ROOT_DIR_ENTRIES);
-                for (uint16_t j = 0; j < num_folder_files; j++) {
-                    if (sector_to_cluster(lba) == LE_2U8_TO_U16(folder_files[j].starting_cluster)) {
-                        is_reserved_cluster = 1;
-                        break;
-                    }
-                }
-            }
+    int32_t reserved_clusters[] = {0, 1, get_file_cluster(get_filesystem(), 0, "README"), 
+        get_file_cluster(get_filesystem(), 0, "OPTIONS")};
+    for (uint16_t i = 0; i < ARR_LEN(reserved_clusters); i++) {
+        if (sector_to_cluster(lba) == reserved_clusters[i]) {
+            is_reserved_cluster = 1;
         }
     }
 
-    struct directory_entry bitstream_info = {0};
-    if (!is_reserved_cluster) return -1; // always busy if we don't know about the file
-    int fpga_cluster = get_file_cluster(0, "FPGA");
-    if (fpga_cluster < 0) return -1;
-
-    if (!get_first_file_in_dir(fpga_cluster, &bitstream_info)) {
-        uint16_t bitstream_start_cluster = LE_2U8_TO_U16(bitstream_info.starting_cluster);
-        if ((sector_to_cluster(lba) == bitstream_start_cluster) && !FPGA_PROG_BYTES_LEFT) {
-            if ((!FPGA_ERASED) && !FPGA_ERASED_START) {
-                // set NPROG low
+    if (!is_reserved_cluster) {
+        if (!FPGA_PROG_BYTES_LEFT) {
+            int len_offset = find_bitstream_len_offset(buffer, bufsize);
+            if (len_offset >= 0) {
                 gpio_put(26, 1); // LED off
                 fpga_program_setup1(); // nprog low to erase
-                FPGA_ERASED_START = board_millis(); // get start of erase time
-                return 0; // busy
-            } else if (FPGA_ERASED_START) {
-                if ((board_millis() - FPGA_ERASED_START) < 100) {
-                    return 0; // still waiting on erase
-                } else {
-                    FPGA_ERASED = 1;
-                    FPGA_ERASED_START = 0;
-                    gpio_put(24, 1);
-                    fpga_program_setup2();
-                }
+                FPGA_ERASED_START = board_millis();
+                // while ((cur_time - FPGA_ERASED_START) < 2) cur_time = board_millis(); // T_program says >250ns, so this should be safe
+                for (volatile uint32_t i = 0; i < 5000; i++);
+                uint32_t cur_time = board_millis();
+                fpga_program_setup2();
+                FPGA_PROG_BYTES_LEFT = BE_4U8_TO_U32(buffer + len_offset);
+                FPGA_PROG_BYTES_LEFT += len_offset;
+
+                bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
+                fpga_program_sendchunk(buffer, bufsize);
+                FPGA_PROG_BYTES_LEFT -= bufsize;
             }
-
-            if (FPGA_ERASED) {
-                    // uint16_t header_end_loc = 0;
-                    // uint8_t match_pattern[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-                    // for (; header_end_loc < (bufsize - sizeof(match_pattern)); header_end_loc++) {
-                    //     if (buffer[header_end_loc] != 0xFF) continue;
-                    //     if (!memcmp(buffer + header_end_loc, match_pattern, sizeof(match_pattern))) break; // found
-                    // }
-                    int len_loc = find_bitstream_len_offset(buffer, bufsize);
-                    if (len_loc < 0) {
-                        set_err_led(1);
-                }
-                    return -1;
-
-                    FPGA_PROG_BYTES_LEFT = BE_4U8_TO_U32(buffer + len_loc);
-                FPGA_PROG_BYTES_LEFT += header_end_loc; // TODO: check this shouldn't be +1 or -1 or something
-                    fpga_init_dma();
-                FPGA_ERASED = 0;
-
-            }
-        }
-        if (is_cluster_in_chain(bitstream_start_cluster, sector_to_cluster(lba))) {
-            if (FPGA_PROG_BYTES_LEFT) {
-                if (dma_channel_is_busy(fpga_dma)) {
-                    return 0;
-                } else {
-                    gpio_put(26, led_state_a); // blink every time we get here
-                    led_state_a ^= 1;
-                    // start transfer
-                        // bufsize = min(bufsize, sizeof(FPGA_WRITE_BUF));
-                    bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
-                        // memcpy(FPGA_WRITE_BUF, buffer, bufsize);
-                        // dma_channel_configure(fpga_dma, &fpga_dma_config, &spi_get_hw(spi1)->dr,
-                        //     FPGA_WRITE_BUF, bufsize, true);
-
-                        int written_bytes = fpga_send_dma(buffer, bufsize);
-                    // spi_write_blocking(spi1, buffer, bufsize);
-                    // for (uint32_t i = 0; i < bufsize; i++) {
-                    //     fpga_program_sendbyte(buffer[i]);
-                    // }
-                        FPGA_PROG_BYTES_LEFT -= written_bytes;
-                    if (!FPGA_PROG_BYTES_LEFT) {
-                        FPGA_PROG_IN_PROCESS = 0;
-                    }
-                    // return bufsize;
-                    } else {
-                        return 0;
-                }
-            }
+        } else {
+            // this should be okay for now, may rework to follow file table to handle
+            // writing to multiple files at a time
+            bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
+            fpga_program_sendchunk(buffer, bufsize);
+            FPGA_PROG_BYTES_LEFT -= bufsize;
         }
     }
+
     if (lba >= DISK_REAL_SECTOR_NUM)
         return bufsize; // fake it
     struct fat_filesystem *fs = get_filesystem();
@@ -272,7 +186,6 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     memcpy(addr, buffer, bufsize);
     return bufsize;
 }
-#endif
 
 // Callback invoked when received an SCSI command not in built-in list below
 // - READ_CAPACITY10, READ_FORMAT_CAPACITY, INQUIRY, MODE_SENSE6, REQUEST_SENSE

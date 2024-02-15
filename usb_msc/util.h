@@ -13,3 +13,5 @@
 
 #define BE_4U8_TO_U32(X) ((X)[3] | ((X)[2] << 8) | ((X)[1] << 16) | ((X)[0] << 24))
 #define BE_2U8_TO_U16(X) ((X)[1] | ((X)[0] << 8))
+
+#define ARR_LEN(X) ((sizeof(X)) / (sizeof(X[0])))

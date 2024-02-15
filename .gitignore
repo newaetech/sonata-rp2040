@@ -4,3 +4,4 @@ _deps
 cmake-*
 .DS_Store
 *.pdf
+build/*

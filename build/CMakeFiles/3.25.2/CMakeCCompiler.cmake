@@ -1,4 +1,4 @@
-set(CMAKE_C_COMPILER "C:/Users/adewa/code/rppico/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe")
+set(CMAKE_C_COMPILER "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe")
 set(CMAKE_C_COMPILER_ARG1 "")
 set(CMAKE_C_COMPILER_ID "GNU")
 set(CMAKE_C_COMPILER_VERSION "10.3.1")
@@ -21,11 +21,11 @@ set(CMAKE_C_SIMULATE_VERSION "")
 
 
 
-set(CMAKE_AR "C:/Users/adewa/code/rppico/gcc-arm-none-eabi/bin/arm-none-eabi-ar.exe")
-set(CMAKE_C_COMPILER_AR "C:/Users/adewa/code/rppico/gcc-arm-none-eabi/bin/arm-none-eabi-gcc-ar.exe")
-set(CMAKE_RANLIB "C:/Users/adewa/code/rppico/gcc-arm-none-eabi/bin/arm-none-eabi-ranlib.exe")
-set(CMAKE_C_COMPILER_RANLIB "C:/Users/adewa/code/rppico/gcc-arm-none-eabi/bin/arm-none-eabi-gcc-ranlib.exe")
-set(CMAKE_LINKER "C:/Users/adewa/code/rppico/gcc-arm-none-eabi/bin/arm-none-eabi-ld.exe")
+set(CMAKE_AR "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/bin/arm-none-eabi-ar.exe")
+set(CMAKE_C_COMPILER_AR "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/bin/arm-none-eabi-gcc-ar.exe")
+set(CMAKE_RANLIB "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/bin/arm-none-eabi-ranlib.exe")
+set(CMAKE_C_COMPILER_RANLIB "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/bin/arm-none-eabi-gcc-ranlib.exe")
+set(CMAKE_LINKER "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/bin/arm-none-eabi-ld.exe")
 set(CMAKE_MT "")
 set(CMAKE_COMPILER_IS_GNUCC 1)
 set(CMAKE_C_COMPILER_LOADED 1)
@@ -66,7 +66,7 @@ endif()
 
 
 
-set(CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "C:/Users/adewa/code/rppico/gcc-arm-none-eabi/lib/gcc/arm-none-eabi/10.3.1/include;C:/Users/adewa/code/rppico/gcc-arm-none-eabi/lib/gcc/arm-none-eabi/10.3.1/include-fixed;C:/Users/adewa/code/rppico/gcc-arm-none-eabi/arm-none-eabi/include")
+set(CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/lib/gcc/arm-none-eabi/10.3.1/include;C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/lib/gcc/arm-none-eabi/10.3.1/include-fixed;C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/arm-none-eabi/include")
 set(CMAKE_C_IMPLICIT_LINK_LIBRARIES "")
-set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "C:/Users/adewa/code/rppico/gcc-arm-none-eabi/lib/gcc/arm-none-eabi/10.3.1/thumb/v6-m/nofp;C:/Users/adewa/code/rppico/gcc-arm-none-eabi/arm-none-eabi/lib/thumb/v6-m/nofp;C:/Users/adewa/code/rppico/gcc-arm-none-eabi/lib/gcc/arm-none-eabi/10.3.1;C:/Users/adewa/code/rppico/gcc-arm-none-eabi/lib/gcc;C:/Users/adewa/code/rppico/gcc-arm-none-eabi/arm-none-eabi/lib")
+set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/lib/gcc/arm-none-eabi/10.3.1/thumb/v6-m/nofp;C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/arm-none-eabi/lib/thumb/v6-m/nofp;C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/lib/gcc/arm-none-eabi/10.3.1;C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/lib/gcc;C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/arm-none-eabi/lib")
 set(CMAKE_C_IMPLICIT_LINK_FRAMEWORK_DIRECTORIES "")

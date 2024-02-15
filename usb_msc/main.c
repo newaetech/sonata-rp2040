@@ -56,7 +56,8 @@ void set_err_led(int on)
 
 uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
-int main() {
+int main() 
+{
     const uint LED_PIN = 24; // LED1
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
@@ -68,47 +69,22 @@ int main() {
     gpio_put(25, 0);
     gpio_put(26, 0);
 
-    gpio_init(GPIO_SW0); gpio_set_dir(GPIO_SW0, GPIO_IN); gpio_pull_up(GPIO_SW0);
-    gpio_init(GPIO_SW1); gpio_set_dir(GPIO_SW1, GPIO_IN); gpio_pull_up(GPIO_SW1);
-    gpio_init(GPIO_SW2); gpio_set_dir(GPIO_SW2, GPIO_IN); gpio_pull_up(GPIO_SW2);
-
     board_init();
-    spi_init(spi1, 5000E3); //Min speed seems to be ~100kHz, below that USB gets angry
+    tud_init(BOARD_TUD_RHPORT);
+    spi_init(spi1, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
 
     gpio_set_function(11, GPIO_FUNC_SPI); // TX pin
     gpio_set_function(10, GPIO_FUNC_SPI); // CLK pin
-    // gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
+    gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
 
     gpio_init(FPGA_CONFIG_LED); // LED0 // note should be LED3 at somepoint
     gpio_set_dir(FPGA_CONFIG_LED, GPIO_OUT);
-    bitstream_init_spi();
 
-    // check boot sector on spi flash, if not right, overwrite
-    struct boot_sector flash_boot_sec = {};
-    struct fat_filesystem *fs = get_filesystem();
-    spi_flash_read(0x00, &flash_boot_sec, sizeof(flash_boot_sec));
-    if (memcmp(&flash_boot_sec, &fs->boot_sec, sizeof(struct boot_sector))) {
-        uint16_t num_erases = sizeof(struct fat_filesystem) / 4096;
-        uint32_t num_writes = sizeof(struct fat_filesystem) / 256;
-        
-        for (uint16_t i = 0; i < num_erases; i++) {
-            spi_flash_sector_erase(4096 * i);
-        }
-
-        for (uint32_t i = 0; i < num_writes; i++) {
-            spi_flash_page_program(i * 256, (void *)fs);
-        }
-    }
-
-
-    tud_init(BOARD_TUD_RHPORT);
     FPGA_DONE_PIN_SETUP();
     FPGA_NPROG_SETUP();
 
-    dir_fill_req_entries(3, 0);
-    dir_fill_req_entries(4, 0);
-
-    // check SPI flash?
+    // dir_fill_req_entries(3, 0);
+    // dir_fill_req_entries(4, 0);
 
 
     while (true) {

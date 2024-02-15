@@ -1,4 +1,5 @@
 #include "fat_util.h"
+#include "util.h"
 int is_valid_file(struct directory_entry *entry);
 
 static struct fat_filesystem FILESYSTEM = {
@@ -16,7 +17,7 @@ static struct fat_filesystem FILESYSTEM = {
         .bios_drive_number = 0x80,
         .ext_boot_sig = 0x29,
         .serial_number = {LE_U32_TO_4U8(0x1234)},
-        .volume_label = {'T', 'i', 'n', 'y', 'U', 'S', 'B', ' ', '0', ' ', ' '},
+        .volume_label = {'S', 'O', 'N', 'A', 'T', 'A', ' ', ' ', ' ', ' ', ' '},
         .sys_identifier = {'F', 'A', 'T', '1', '6', ' ', ' ', ' '},
         .sig = {0x55, 0xAA},
         .sectors_per_head = {32, 0x00},
@@ -26,44 +27,32 @@ static struct fat_filesystem FILESYSTEM = {
                 0xF8, 0xFF, // 16 bits for FAT ID , 12 for FAT12, etc. (0xFFF8 for partitioned disk)
                 0xFF, 0xFF, // End of chain indicator (reserved cluster?)
                 0xFF, 0xFF, // cluster 2 (README.txt in our case)
-                0xFF, 0xFF, // cluster 2 (README.txt in our case)
-                0xFF, 0xFF, // cluster 2 (README.txt in our case)
-                            // 0xFF, 0xFF, // cluster 3 (FPGA folder in our case)
-                            // 0xFF, 0xFF, // cluster 4 (SRAM folder in our case)
-            }
-    .root_dir = {{.filename = {'T', 'i', 'n', 'y', 'U', 'S', 'B', ' '}, // name
-                  .extension = {'0', ' ', ' '},
-                  .attribute = 0x08, // volume label
-                  .time_stamp = {0x4F, 0x6D},
-                  .date_stamp = {0x65, 0x43}},
-                 {.filename = {'R', 'E', 'A', 'D', 'M', 'E', ' ', ' '}, 
-                 .extension = {'T', 'X', 'T'}, .creation_time = {0x52, 0x6D},
-                  .creation_date = {0x65, 0x43}, .last_access_date = {0x65, 0x43}, 
-                  .time_stamp = {0x88, 0x6D}, .date_stamp = {0x65, 0x43}, 
-                  .starting_cluster = {0x02, 0x00}, .file_size = {LE_U32_TO_4U8(sizeof(README_CONTENTS) - 1)}},
-                 {
-                     .filename = {'F', 'P', 'G', 'A', ' ', ' ', ' ', ' '},
-                     .extension = {' ', ' ', ' '}, // extension
-                     .attribute = 0x10,            // directory
-                     .creation_time = {0x52, 0x6D},
-                     .creation_date = {0x65, 0x43},
-                     .last_access_date = {0x65, 0x43},
-                     .time_stamp = {0x88, 0x6D},
-                     .date_stamp = {0x65, 0x43},
-                     .starting_cluster = {0x03, 0x00},
-                 },
-                 {
-                     .filename = {'F', 'L', 'A', 'S', 'H', ' ', ' ', ' '},
-                     .extension = {' ', ' ', ' '}, // extension
-                     .attribute = 0x10,            // directory
-                     .creation_time = {0x52, 0x6D},
-                     .creation_date = {0x65, 0x43},
-                     .last_access_date = {0x65, 0x43},
-                     .time_stamp = {0x88, 0x6D},
-                     .date_stamp = {0x65, 0x43},
-                     .starting_cluster = {0x04, 0x00},
-                 }},
-    .clusters = {{README_CONTENTS}, {}, {}}};
+                0xFF, 0xFF, // cluster 3 (OPTIONS.txt in our case)
+            }},
+    .root_dir = {{
+                    .filename = {'S', 'O', 'N', 'A', 'T', 'A', ' ', ' '}, // name
+                    .extension = {' ', ' ', ' '},
+                    .attribute = 0x08, // volume label
+                    .time_stamp = {0x4F, 0x6D},
+                    .date_stamp = {0x65, 0x43}
+                },
+                {
+                    .filename = {'R', 'E', 'A', 'D', 'M', 'E', ' ', ' '}, 
+                    .extension = {'T', 'X', 'T'}, .creation_time = {0x52, 0x6D},
+                    .creation_date = {0x65, 0x43}, .last_access_date = {0x65, 0x43}, 
+                    .time_stamp = {0x88, 0x6D}, .date_stamp = {0x65, 0x43}, 
+                    .starting_cluster = {0x02, 0x00}, .file_size = {LE_U32_TO_4U8(sizeof(README_CONTENTS) - 1)}
+                },
+                {
+                    .filename = {'O', 'P', 'T', 'I', 'O', 'N', 'S', ' '}, 
+                    .extension = {'T', 'X', 'T'}, .creation_time = {0x52, 0x6D},
+                    .creation_date = {0x65, 0x43}, .last_access_date = {0x65, 0x43}, 
+                    .time_stamp = {0x88, 0x6D}, .date_stamp = {0x65, 0x43}, 
+                    .starting_cluster = {0x03, 0x00}, .file_size = {LE_U32_TO_4U8(sizeof(OPTIONS_CONTENTS) - 1)}
+                }
+                },
+    .clusters = {{README_CONTENTS}, {OPTIONS_CONTENTS}, {}}
+};
 
 // int validate_filesystem(void *memory, uint32_t memlen)
 // {

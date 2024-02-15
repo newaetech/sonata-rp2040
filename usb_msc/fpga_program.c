@@ -15,6 +15,11 @@ void fpga_program_sendbyte(uint8_t databyte)
     // set nprog high
     spi_write_blocking(spi1, &databyte, 1);
 }
+
+int fpga_program_sendchunk(uint8_t *data, uint32_t len)
+{
+    return spi_write_blocking(spi1, data, len);
+}
 static volatile uint8_t FPGA_WRITE_BUF[512];
 dma_channel_config fpga_dma_config;
 int fpga_dma = -1;
@@ -58,17 +63,26 @@ int find_bitstream_len_offset(uint8_t *bitstream, uint16_t len)
     };
 
     uint16_t header_end_loc = 0;
+    uint8_t found_ff = 0;
     for (; header_end_loc < (len - sizeof(magic_seq)); header_end_loc++) {
-        if (bitstream[header_end_loc] != 0xFF) continue; //find first 0xFF
+        if (!found_ff) {
+            if (bitstream[header_end_loc] != 0xFF)  {
+                continue; //find first 0xFF
+            } else {
+                found_ff = 1;
+            }
+        }
         if (!memcmp(bitstream + header_end_loc, magic_seq, sizeof(magic_seq))) break;
     }
     if ((header_end_loc + sizeof(magic_seq)) >= len) {
         return -1;
     }
+    header_end_loc--;
+    while (bitstream[header_end_loc] == 0xFF) header_end_loc--;
     // work backwards to find len
-    for (; header_end_loc > 0; header_end_loc -= 4) {
-        if (bitstream[header_end_loc] != 0xFF) break;
-    }
+    // for (; header_end_loc > 0; header_end_loc -= 4) {
+    //     if (bitstream[header_end_loc] != 0xFF) break;
+    // }
     if (header_end_loc <= 4) return -1;
 
     return header_end_loc - 4;
