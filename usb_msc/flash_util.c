@@ -53,14 +53,16 @@ int SPI_FLASH_CS_PIN = 0;
 
 void bitstream_init_spi(void)
 {
-    spi_init(flash_spi, 25E6); //Try 25MHz
+    spi_init(flash_spi, 1E6); //Try 25MHz
 
     gpio_set_function(BS_SPI_DI, GPIO_FUNC_SPI); // RX pin
     gpio_set_function(BS_SPI_DO, GPIO_FUNC_SPI); // TX pin
     gpio_set_function(BS_SPI_CLK, GPIO_FUNC_SPI); // CLK pin
 
-    gpio_init(BS_SPI_CLK);
-    gpio_set_dir(BS_SPI_CLK, GPIO_OUT);
+    gpio_init(BS_SPI_CS);
+    gpio_set_dir(BS_SPI_CS, GPIO_OUT);
+    gpio_put(BS_SPI_CS, 1);
+    SPI_FLASH_CS_PIN = BS_SPI_CS;
 }
 
 void firmware_init_spi(void)
@@ -79,6 +81,21 @@ void firmware_init_spi(void)
 //     channel_config_set_read_increment(&bs_spi_dma_config, false);
 // }
 
+uint16_t spi_flash_read_id(void)
+{
+    uint8_t cmd = 0x90;
+    uint16_t read_data = 0;
+
+    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_write_blocking(flash_spi, &cmd, 1);
+
+    spi_read_blocking(flash_spi, 0x00, &read_data, 2); // dummy read
+    spi_read_blocking(flash_spi, 0x00, &read_data, 2);
+    gpio_put(SPI_FLASH_CS_PIN, 1);
+
+    return read_data;
+}
+
 int spi_flash_poll_status(uint8_t and_match)
 {
     uint8_t cmd = SPI_CMD_READ_STATUS1;
@@ -91,6 +108,7 @@ int spi_flash_poll_status(uint8_t and_match)
     while (!(rtn & and_match)) {
         spi_read_blocking(flash_spi, 0x00, &rtn, 1);
     }
+    gpio_put(SPI_FLASH_CS_PIN, 1);
 
     return 0;
 }
