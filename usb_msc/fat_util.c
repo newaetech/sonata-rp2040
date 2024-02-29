@@ -1,4 +1,5 @@
 #include "fat_util.h"
+#include <stdint.h>
 #include "util.h"
 int is_valid_file(struct directory_entry *entry);
 
@@ -54,28 +55,21 @@ static struct fat_filesystem FILESYSTEM = {
     .clusters = {{README_CONTENTS}, {OPTIONS_CONTENTS}, {}}
 };
 
-// int validate_filesystem(void *memory, uint32_t memlen)
-// {
-//     if (memlen < sizeof(FILESYSTEM)) return -1; // didn't read enough from flash
-//     struct fat_filesystem *flash_filesystem = memory;
+/*
 
-//     if (memcmp(&flash_filesystem->boot_sec, &FILESYSTEM.boot_sec, sizeof(FILESYSTEM.boot_sec))) {
-//         return -2; // boot sec doesn't match
-//     }
+    Converts a cstring to a fat filesystem string by converting nulls to spaces
 
-//     uint8_t file_table_start[] = {0xF8, 0xFF, 0xFF, 0xFF};
-//     if (memcmp(&flash_filesystem->fat, file_table_start, sizeof(file_table_start))) {
-//         return -3; // FAT probably corrupted
-//     }
-// }
+    TODO: should memzero fatstr?
 
+*/
 int cstr_to_fatstr(char *cstr, uint8_t *fatstr)
 {
     if (!fatstr) return -1;
     if (!cstr) return -1;
-    strncpy(fatstr, cstr, 8);
+    strncpy(fatstr, cstr, FAT_NAME_SZ); // copies all 8 characters, may not include NULL
+
     // convert nulls to spaces
-    for (uint8_t i = 0; i < 8; i++) {
+    for (uint8_t i = 0; i < FAT_NAME_SZ; i++) {
         if (!fatstr[i]) {
             fatstr[i] = ' ';
         }
@@ -83,39 +77,87 @@ int cstr_to_fatstr(char *cstr, uint8_t *fatstr)
     return 0;
 }
 
+/*
+    Get a pointer to the filesystem in RAM
+*/
 struct fat_filesystem *get_filesystem(void)
 {
     return &FILESYSTEM;
 }
 
 /*
-    Get cluster number for a file with name filename. Return -1 if it couldn't be found
+    Get the number of directory entries for a particular cluster
 
-    Gives the FAT cluster index instead of the entry in FILESYSTEM.clusters, the latter of which is 2 lower (i.e. it starts at 0 instead of 2)
+    This is a fixed number for the root cluster and determined by the size of clusters for other clusters
 */
-int32_t get_file_cluster(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename)
+uint16_t get_num_dir_entries(uint16_t cluster)
+{
+    if (!cluster) return NUM_ROOT_DIR_ENTRIES;
+    else          return (DISK_SECTOR_SIZE * DISK_SECTOR_PER_CLUSTER) / sizeof(struct directory_entry);
+
+}
+
+/*
+    Get a pointer to the directory entries for a given cluster
+
+    If the cluster number is < 2, a pointer to the root dir will be returned
+
+    If the cluster is unallocated, returns NULL
+*/
+struct directory_entry *cluster_to_dir(struct fat_filesystem *fs, uint16_t cluster)
+{
+    struct directory_entry *rtn = NULL;
+    if (cluster < 2) { // parent cluster being root dir is a special case
+        rtn = fs->root_dir;
+    }
+    if (!rtn) {
+        if (!cluster_to_fat_table_val(fs, cluster)) return NULL; // if parent cluster is unallocated, abort
+        rtn = fs->directories[cluster - 2];
+    }
+    return rtn;
+}
+
+/*
+    Searches a cluster for a file with a given filename
+
+    WARNING: Does not check file extensions
+*/
+int32_t get_file_index(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename)
 {
     uint8_t name_cpy[8];
+
+    struct directory_entry *parent_dir = cluster_to_dir(fs, parent_cluster);
+    uint16_t dir_entries = get_num_dir_entries(parent_cluster);
+    if (!parent_dir) return -1; // 
+
     cstr_to_fatstr(filename, name_cpy); // make sure the filename is in FAT str format
-    uint8_t dir_entries = (DISK_SECTOR_SIZE * DISK_SECTOR_PER_CLUSTER) / sizeof(struct directory_entry);
-    struct directory_entry *parent_dir = NULL;
-    if (!parent_cluster) { // parent cluster being root dir is a special case
-        parent_dir = fs->root_dir;
-        dir_entries = NUM_ROOT_DIR_ENTRIES;
-    }
-    if (!parent_dir) {
-        if (!cluster_to_fat_table_val(fs, parent_cluster)) return -1; // if parent cluster is unallocated, abort
-        parent_dir = fs->directories[parent_cluster - 2];
-    }
 
     // search for the filename
     int file_index = -1;
     for (uint8_t i = 0; i < dir_entries; i++) {
-        if (!memcmp(name_cpy, parent_dir[i].filename, 8)) {
+        if (!memcmp(name_cpy, parent_dir[i].filename, FAT_NAME_SZ)) {
             file_index = i;
             break;
         }
     }
+    if (file_index < 0) return -1; // couldn't find that folder
+
+    return file_index;
+}
+
+/*
+    Get cluster number for a file with name filename. Return -1 if it couldn't be found
+
+    Gives the FAT cluster index instead of the entry in FILESYSTEM.clusters, the latter of which is 2 lower (i.e. it starts at 0 instead of 2)
+
+    Does not check extensions
+
+    Returns the file cluster or -1 if the cluster can't be found
+*/
+int32_t get_file_cluster(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename)
+{
+    int32_t file_index = get_file_index(fs, parent_cluster, filename);
+    struct directory_entry *parent_dir = cluster_to_dir(fs, parent_cluster);
     if (file_index < 0) return -1; // couldn't find that folder
 
     // now get the cluster where that folder's at
@@ -125,8 +167,27 @@ int32_t get_file_cluster(struct fat_filesystem *fs, uint16_t parent_cluster, cha
     return cluster_num;
 }
 
+
+/*
+    Gets the file information for a file with a given filename
+
+    This information is stored in *file_info
+
+    Returns -1 upon error
+*/
+int32_t get_file_info(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename, struct directory_entry *file_info)
+{
+    int32_t file_index = get_file_index(fs, parent_cluster, filename);
+    struct directory_entry *dir = cluster_to_dir(fs, parent_cluster);
+    if ((file_index < 0) || !dir) return -1; // couldn't find that folder
+    memcpy(file_info, &dir[file_index], sizeof(struct directory_entry));
+    return 0;
+}
+
 /*
     Find out if the cluster in question is in the cluster chain started by starting_cluster
+
+    Returns 1 if the cluster is in the chain, 0 if it isn't, and -1 upon error
 */
 int is_cluster_in_chain(struct fat_filesystem *fs, uint16_t starting_cluster, uint16_t ciq)
 {
@@ -139,6 +200,11 @@ int is_cluster_in_chain(struct fat_filesystem *fs, uint16_t starting_cluster, ui
     return 0;
 }
 
+/*
+
+    Gets the file table entry for a given cluster
+
+*/
 uint16_t cluster_to_fat_table_val(struct fat_filesystem *fs, uint16_t cluster_num)
 {
     return LE_2U8_TO_U16(fs->fat[0] + cluster_num*2);
@@ -153,6 +219,7 @@ uint16_t cluster_to_fat_table_val(struct fat_filesystem *fs, uint16_t cluster_nu
     returns the number of files found (up to max_num_files) or negative values for errors
 
     Does not include the . and .. directories
+
 */
 int get_files_in_directory(uint16_t dir_cluster, struct directory_entry *files, uint16_t max_num_files)
 {
@@ -181,6 +248,10 @@ int get_files_in_directory(uint16_t dir_cluster, struct directory_entry *files, 
 
 }
 
+/*
+    Checks if a given file is valid by checking if it isn't a reserved file (. or ..)
+    or if it has a non-zero staring cluster
+*/
 int is_valid_file(struct directory_entry *entry)
 {
     // now we need to check the folder for files
@@ -197,6 +268,10 @@ int is_valid_file(struct directory_entry *entry)
     return 1;
 }
 
+
+/*
+    Checks if a given directory_entry is for a folder
+*/
 int is_folder(struct directory_entry *entry)
 {
     return (entry->attribute & FAT_DIR_DIRECTORY) == FAT_DIR_DIRECTORY;
@@ -214,7 +289,8 @@ int get_first_file_in_dir(struct fat_filesystem *fs, uint16_t parent_cluster, st
     if (folder_cluster < 0) return -1;
     if (!cluster_to_fat_table_val(fs, folder_cluster)) return -1; // this cluster is free
 
-    struct directory_entry *folderptr = fs->directories[folder_cluster - 2];
+    // struct directory_entry *folderptr = fs->directories[folder_cluster - 2];
+    struct directory_entry *folderptr = cluster_to_dir(fs, parent_cluster);
 
     // now we need to check the folder for files
     // these two entries are reserved, so ignore them
@@ -237,6 +313,9 @@ int get_first_file_in_dir(struct fat_filesystem *fs, uint16_t parent_cluster, st
     return 0;
 }
 
+/*
+    Fill a directory at cluster_num with the . and .. directories
+*/
 void dir_fill_req_entries(uint16_t cluster_num, uint16_t parent_cluster)
 {
     if (cluster_num < 2)

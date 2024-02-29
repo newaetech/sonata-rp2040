@@ -54,18 +54,18 @@ void set_err_led(int on)
 uint8_t test_rdmem[256];
 uint8_t test_mem[256];
 
-int test_spi_flash_prog(void)
-{
-    for (uint32_t i = 0; i < ARR_LEN(test_mem); i++) test_mem[i] = i;
-    spi_flash_sector_erase(0x00);
-    spi_flash_page_program(0x00, test_mem);
-    spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
+// int test_spi_flash_prog(void)
+// {
+//     for (uint32_t i = 0; i < ARR_LEN(test_mem); i++) test_mem[i] = i;
+//     spi_flash_sector_erase(0x00);
+//     spi_flash_page_program(0x00, test_mem);
+//     spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
 
-    int succeeded = 0;
+//     int succeeded = 0;
 
-    succeeded = memcmp(test_mem, test_rdmem, sizeof(test_rdmem));
-    return succeeded;
-}
+//     succeeded = memcmp(test_mem, test_rdmem, sizeof(test_rdmem));
+//     return succeeded;
+// }
 
 uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
@@ -85,7 +85,7 @@ int main()
     board_init();
     tud_init(BOARD_TUD_RHPORT);
     spi_init(spi1, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
-    bitstream_init_spi();
+    bitstream_init_spi(10E6);
 
     // volatile uint16_t dev_id = spi_flash_read_id();
 

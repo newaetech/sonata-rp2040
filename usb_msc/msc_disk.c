@@ -5,16 +5,26 @@
 #include "hardware/spi.h"
 #include "fpga_program.h"
 #include "flash_util.h"
+#include "config.h"
 #include "fat_util.h"
 #include "util.h"
 #include "main.h"
+#include "config.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 
 #define FF_BITSTREAM_LOCATION
 
-uint8_t FLASH_READ_BUF[4096];
+// uint8_t FLASH_READ_BUF[4096];
+
+uint8_t SPI_FLASH_WRITE_BUF[CONST_64k];
+uint32_t SPI_FLASH_BUF_INDEX = 0;
+
+struct config_options CONFIG = {.dirty = 1, 
+                                .fpga_prog_speed = CONF_DEFAULT_FPGA_PROG_SPEED,
+                                .flash_prog_speed = CONF_DEFAULT_FLASH_PROG_SPEED,
+                                .prog_flash = CONF_DEFAULT_FLASH_PROG_SPEED};
 
 extern uint32_t blink_interval_ms;
 
@@ -122,14 +132,14 @@ uint8_t FPGA_PROG_IN_PROCESS = 0;
 uint64_t FPGA_PROG_BYTES_LEFT = 0;
 uint32_t FPGA_ERASED_START = 0;
 
+uint32_t FPGA_CURRENT_OFFSET = 0;
+
 // Callback invoked when received WRITE10 command.
 // Process data in buffer to disk's storage and return number of written bytes
 
 uint8_t led_state_a = 0;
 uint8_t led_state_b = 0;
 
-uint8_t FPGA_ERASED = 0;
-uint32_t BITSTREAM_CLUSTER = 0;
 
 
 int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
@@ -138,30 +148,63 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     if (!bufsize) return 0; //wtf?
 
     // cluster 2 is readme, cluster 3 is fpga folder, cluster 4 is flash folder
-    uint16_t num_root_files = 0;
-    uint16_t num_folder_files = 0;
-    struct directory_entry root_files[NUM_ROOT_DIR_ENTRIES];
-    struct directory_entry folder_files[NUM_ROOT_DIR_ENTRIES];
     uint8_t is_reserved_cluster = 0; // should change to "is known file/folder"
 
     int32_t reserved_clusters[] = {0, 1, get_file_cluster(get_filesystem(), 0, "README"), 
         get_file_cluster(get_filesystem(), 0, "OPTIONS")};
+
+    int32_t opt_cluster = get_file_cluster(get_filesystem(), 0, "OPTIONS");
+    if (opt_cluster > 0) {
+        if (sector_to_cluster(lba) == opt_cluster) {
+            CONFIG.dirty = 1; // if we touched options, mark it as dirty
+        }
+    }
+
     for (uint16_t i = 0; i < ARR_LEN(reserved_clusters); i++) {
+        if (reserved_clusters[i] < 0) continue;
         if (sector_to_cluster(lba) == reserved_clusters[i]) {
             is_reserved_cluster = 1;
         }
     }
 
     if (!is_reserved_cluster) {
+        if (CONFIG.dirty) {
+            if (parse_config(get_filesystem(), &CONFIG)) {
+                // if config parse fails, set everything back to default
+                set_default_config(&CONFIG);
+            }
+        }
+        if (CONFIG.prog_flash) {
+            // if we're at the beginning of buffer, start erase
+            if (!SPI_FLASH_BUF_INDEX) {
+                spi_flash_poll_status(SPI_FLASH_STATUS_BUSY);
+                spi_flash_64k_erase_nonblocking(FPGA_CURRENT_OFFSET); // todo add different index options to flash
+            }
+
+            // write into buffer, but not past
+            bufsize = min(bufsize, (CONST_64k - SPI_FLASH_BUF_INDEX));
+            memcpy(SPI_FLASH_WRITE_BUF + SPI_FLASH_BUF_INDEX, buffer, bufsize);
+
+            SPI_FLASH_BUF_INDEX += bufsize;
+
+            if ((SPI_FLASH_BUF_INDEX) >= CONST_64k) { 
+                // if we've maxed out the buffer, start write
+                spi_flash_poll_status(SPI_FLASH_STATUS_BUSY); // ensure erase is finished
+                uint32_t i = 0;
+                while (i < (SPI_FLASH_BUF_INDEX)) {
+                    uint16_t write_len = min(256, SPI_FLASH_BUF_INDEX - i); // can write up to 256 bytes at a time
+                    spi_flash_page_program_blocking(i, SPI_FLASH_WRITE_BUF + i, write_len - 1); // do the write
+                    i += write_len;
+                }
+            } 
+        }
         if (!FPGA_PROG_BYTES_LEFT) {
             int len_offset = find_bitstream_len_offset(buffer, bufsize);
             if (len_offset >= 0) {
                 gpio_put(26, 1); // LED off
                 fpga_program_setup1(); // nprog low to erase
-                FPGA_ERASED_START = board_millis();
-                // while ((cur_time - FPGA_ERASED_START) < 2) cur_time = board_millis(); // T_program says >250ns, so this should be safe
+                // board_millis() seems to not work properly (we're in an interrupt?)
                 for (volatile uint32_t i = 0; i < 5000; i++);
-                uint32_t cur_time = board_millis();
                 fpga_program_setup2();
                 FPGA_PROG_BYTES_LEFT = BE_4U8_TO_U32(buffer + len_offset);
                 FPGA_PROG_BYTES_LEFT += len_offset;

@@ -5,8 +5,8 @@
 #define FPGA_INITB_PIN 8
 #define FPGA_DONE_PIN 7
 
-#define FPGA_NPROG_LOW() gpio_put(FPGA_NPROG_PIN, 0)
-#define FPGA_NPROG_HIGH() gpio_put(FPGA_NPROG_PIN, 1)
+#define FPGA_NPROG_LOW() do {gpio_set_dir(FPGA_NPROG_PIN, GPIO_OUT); gpio_put(FPGA_INITB_PIN, 0);} while(0)
+#define FPGA_NPROG_HIGH() do {gpio_set_dir(FPGA_NPROG_PIN, GPIO_IN);} while(0)
 #define FPGA_NPROG_SETUP() do {gpio_init(FPGA_NPROG_PIN); gpio_set_dir(FPGA_NPROG_PIN, GPIO_OUT);} while(0)
 
 
@@ -37,3 +37,4 @@ void fpga_init_dma(void);
 int32_t fpga_send_dma(uint8_t *buf, uint16_t len);
 
 int is_fpga_dma_ready(void);
+int fpga_program_sendchunk(uint8_t *data, uint32_t len);
