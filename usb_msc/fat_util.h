@@ -63,8 +63,8 @@ static uint32_t sector_to_cluster(uint32_t sector)
 
 #define OPTIONS_CONTENTS \
     "PROG_SPI_FLASH=NO\r\n" \
-    "SPI_FLASH_SPEED_KHZ=5000\r\n" \
-    "SPI_FPGA_SPEED_KHZ=5000\r\n" \
+    "SPI_FLASH_SPEED=5000000\r\n" \
+    "SPI_FPGA_SPEED=5000000\r\n" \
     ""
 
 #pragma pack(push, 1)

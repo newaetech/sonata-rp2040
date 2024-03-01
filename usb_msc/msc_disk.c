@@ -168,6 +168,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     }
 
     if (!is_reserved_cluster) {
+        // if config is marked as dirty, reread it
         if (CONFIG.dirty) {
             if (parse_config(get_filesystem(), &CONFIG)) {
                 // if config parse fails, set everything back to default

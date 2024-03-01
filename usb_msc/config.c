@@ -1,8 +1,8 @@
 #include "config.h"
 #include "util.h"
 
-#define FPGA_PROG_SPEED_STR "SPI_FPGA_SPEED_KHZ"
-#define FLASH_PROG_SPEED_STR "SPI_FLASH_SPEED_KHZ"
+#define FPGA_PROG_SPEED_STR "SPI_FPGA_SPEED"
+#define FLASH_PROG_SPEED_STR "SPI_FLASH_SPEED"
 #define PROG_FLASH_STR "PROG_SPI_FLASH"
 
 // simplify operations
@@ -11,23 +11,26 @@
 uint8_t *get_config_opt_int(uint8_t *str, enum config_options_int *opt)
 {
     if (!str || !opt) return NULL;
+    int cmp = 0;
 
     for (; *str; str++) {
-        if ((*str == ' ') || (*str == '\n')) continue; // skip spaces or newlines
-        if (!strncmp(str, FPGA_PROG_SPEED_STR, sizeof(FPGA_PROG_SPEED_STR))) {
+        if ((*str == ' ') || (*str == '\n') || (*str == '\r')) continue; // skip spaces or newlines
+
+        // NOTE: need sizeof() - 1, since string size includes null terminator, which won't be there in str
+        if (cmp = strncmp(str, FPGA_PROG_SPEED_STR, sizeof(FPGA_PROG_SPEED_STR) - 1), !cmp) {
             *opt = CONF_FPGA_PROG_SPEED;
             // str += sizeof(FPGA_PROG_SPEED_STR); //advance past 
-            return strchr(str, '='); // return pointer str after =
+            return strchr(str, '=') + 1; // return pointer str after =
         }
-        if (!strncmp(str, FLASH_PROG_SPEED_STR, sizeof(FLASH_PROG_SPEED_STR))) {
+        if (cmp = strncmp(str, FLASH_PROG_SPEED_STR, sizeof(FLASH_PROG_SPEED_STR) - 1), !cmp) {
             *opt = CONF_FLASH_PROG_SPEED;
             // str += sizeof(FLASH_PROG_SPEED_STR);
-            return strchr(str, '=');
+            return strchr(str, '=') + 1;
         }
-        if (!strncmp(str, PROG_FLASH_STR, sizeof(PROG_FLASH_STR))) {
+        if (cmp = strncmp(str, PROG_FLASH_STR, sizeof(PROG_FLASH_STR) - 1), !cmp) {
             *opt = CONF_PROG_FLASH;
             // str += sizeof(PROG_FLASH_STR);
-            return strchr(str, '=');
+            return strchr(str, '=') + 1;
         }
     }
 
@@ -73,14 +76,15 @@ int parse_config(struct fat_filesystem *fs, struct config_options *opts)
                 break;
             case CONF_PROG_FLASH:
                 while (*cur_line == ' ') cur_line++; // skip spaces
-                if (!memcmp(cur_line, "YES", sizeof("YES")))    opts->prog_flash = true;
-                else if (!memcmp(cur_line, "NO", sizeof("NO"))) opts->prog_flash = false;
+                if (!memcmp(cur_line, "YES", sizeof("YES") - 1))    opts->prog_flash = true;
+                else if (!memcmp(cur_line, "NO", sizeof("NO") - 1)) opts->prog_flash = false;
                 break;
             default:
                 return -1;
 
         }
-        cur_line = strchr(cur_line, '\n'); // get to next line, or end things
+        cur_line = strpbrk(cur_line, "\r\n"); // get to next line, or end things
+
     }
     opts->dirty = 0;
     return 0;

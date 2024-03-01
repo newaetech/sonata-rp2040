@@ -15,6 +15,7 @@
 #include "hardware/spi.h"
 #include "fpga_program.h"
 #include "fat_util.h"
+#include "config.h"
 #include "flash_util.h"
 #include "util.h"
 
@@ -50,7 +51,7 @@ void set_err_led(int on)
 {
   // TODO
 }
-
+extern struct config_options CONFIG;
 uint8_t test_rdmem[256];
 uint8_t test_mem[256];
 
@@ -105,6 +106,10 @@ int main()
 
     // dir_fill_req_entries(3, 0);
     // dir_fill_req_entries(4, 0);
+    if (parse_config(get_filesystem(), &CONFIG)) {
+        // if config parse fails, set everything back to default
+        set_default_config(&CONFIG);
+    }
 
 
     while (true) {
