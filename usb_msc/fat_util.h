@@ -62,9 +62,7 @@ static uint32_t sector_to_cluster(uint32_t sector)
     ""
 
 #define OPTIONS_CONTENTS \
-    "PROG_SPI_FLASH=NO\r\n" \
-    "SPI_FLASH_SPEED=5000000\r\n" \
-    "SPI_FPGA_SPEED=5000000\r\n" \
+    "\r\n" \
     ""
 
 #pragma pack(push, 1)
@@ -176,3 +174,5 @@ int is_folder(struct directory_entry *entry);
 uint32_t get_file_length(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename);
 
 int32_t get_file_info(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename, struct directory_entry *file_info);
+
+int32_t write_file_info(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename, struct directory_entry *file_info);

@@ -55,18 +55,23 @@ extern struct config_options CONFIG;
 uint8_t test_rdmem[256];
 uint8_t test_mem[256];
 
-// int test_spi_flash_prog(void)
-// {
-//     for (uint32_t i = 0; i < ARR_LEN(test_mem); i++) test_mem[i] = i;
-//     spi_flash_sector_erase(0x00);
-//     spi_flash_page_program(0x00, test_mem);
-//     spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
+int test_spi_flash_prog(void)
+{
+    for (uint32_t i = 0; i < ARR_LEN(test_mem); i++) test_mem[i] = i;
+    spi_flash_sector_erase_blocking(0x00);
+    volatile enum spi_flash_status1 status = spi_flash_read_status();
+    spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
+    for (uint16_t i = 0; i < ARR_LEN(test_rdmem); i++) {
+      if ((test_rdmem[i] != 0xFF)) { // erased mem is 0xFF
+        return -1;
+      }
+    }
 
-//     int succeeded = 0;
+    spi_flash_page_program_blocking(0x00, test_mem, ARR_LEN(test_mem));
+    spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
 
-//     succeeded = memcmp(test_mem, test_rdmem, sizeof(test_rdmem));
-//     return succeeded;
-// }
+    if (memcmp(test_mem, test_rdmem, sizeof(test_rdmem))) return -2;
+}
 
 uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
@@ -87,6 +92,10 @@ int main()
     tud_init(BOARD_TUD_RHPORT);
     spi_init(spi1, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
     bitstream_init_spi(10E6);
+    test_spi_flash_prog();
+
+    bitstream_init_spi(10E6);
+    test_spi_flash_prog();
 
     // volatile uint16_t dev_id = spi_flash_read_id();
 
@@ -106,6 +115,8 @@ int main()
 
     // dir_fill_req_entries(3, 0);
     // dir_fill_req_entries(4, 0);
+    set_default_config(&CONFIG);
+    write_config_to_file(get_filesystem(), &CONFIG);
     if (parse_config(get_filesystem(), &CONFIG)) {
         // if config parse fails, set everything back to default
         set_default_config(&CONFIG);

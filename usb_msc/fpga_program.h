@@ -22,7 +22,7 @@
 
 void fpga_program_sendbyte(uint8_t databyte);
 
-void fpga_program_init(void);
+void fpga_program_init(uint32_t baud);
 
 void fpga_program_setup1(void);
 

@@ -185,6 +185,24 @@ int32_t get_file_info(struct fat_filesystem *fs, uint16_t parent_cluster, char *
 }
 
 /*
+    Writes file information to a file matching filename in the directory of parent_cluster
+
+    This function does not:
+        * Create a file if it does not exist
+        * Touch the file table in any way
+        * Handle files that span multiple clusters
+        * Check that the information in *file_info is valid
+*/
+int32_t write_file_info(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename, struct directory_entry *file_info)
+{
+    int32_t file_index = get_file_index(fs, parent_cluster, filename);
+    struct directory_entry *dir = cluster_to_dir(fs, parent_cluster);
+    if ((file_index < 0) || !dir) return -1; // couldn't find that folder
+    memcpy(&dir[file_index], file_info, sizeof(struct directory_entry));
+    return 0;
+}
+
+/*
     Find out if the cluster in question is in the cluster chain started by starting_cluster
 
     Returns 1 if the cluster is in the chain, 0 if it isn't, and -1 upon error

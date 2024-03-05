@@ -4,8 +4,8 @@
 #include <fat_util.h>
 
 enum config_defaults {
-    CONF_DEFAULT_FPGA_PROG_SPEED = (int)10E6,
-    CONF_DEFAULT_FLASH_PROG_SPEED = (int)10E6,
+    CONF_DEFAULT_FPGA_PROG_SPEED = (int)5E6,
+    CONF_DEFAULT_FLASH_PROG_SPEED = (int)5E6,
     CONF_DEFAULT_PROG_FLASH = false
 };
 
@@ -27,4 +27,5 @@ enum config_options_int {
 
 int parse_config(struct fat_filesystem *fs, struct config_options *opts);
 void set_default_config(struct config_options *opts);
+int write_config_to_file(struct fat_filesystem *fs, struct config_options *opts);
 // int read_config(struct fat_filesystem *fs, void *mem, uint32_t len);

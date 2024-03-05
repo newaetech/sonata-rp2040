@@ -157,6 +157,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     if (opt_cluster > 0) {
         if (sector_to_cluster(lba) == opt_cluster) {
             CONFIG.dirty = 1; // if we touched options, mark it as dirty
+            is_reserved_cluster = 1;
         }
     }
 
@@ -175,51 +176,65 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                 set_default_config(&CONFIG);
             }
         }
-        if (CONFIG.prog_flash) {
-            // if we're at the beginning of buffer, start erase
-            if (!SPI_FLASH_BUF_INDEX) {
-                spi_flash_poll_status(SPI_FLASH_STATUS_BUSY);
-                spi_flash_64k_erase_nonblocking(FPGA_CURRENT_OFFSET); // todo add different index options to flash
-            }
 
-            // write into buffer, but not past
-            bufsize = min(bufsize, (CONST_64k - SPI_FLASH_BUF_INDEX));
-            memcpy(SPI_FLASH_WRITE_BUF + SPI_FLASH_BUF_INDEX, buffer, bufsize);
-
-            SPI_FLASH_BUF_INDEX += bufsize;
-
-            if ((SPI_FLASH_BUF_INDEX) >= CONST_64k) { 
-                // if we've maxed out the buffer, start write
-                spi_flash_poll_status(SPI_FLASH_STATUS_BUSY); // ensure erase is finished
-                uint32_t i = 0;
-                while (i < (SPI_FLASH_BUF_INDEX)) {
-                    uint16_t write_len = min(256, SPI_FLASH_BUF_INDEX - i); // can write up to 256 bytes at a time
-                    spi_flash_page_program_blocking(i, SPI_FLASH_WRITE_BUF + i, write_len - 1); // do the write
-                    i += write_len;
-                }
-            } 
-        }
         if (!FPGA_PROG_BYTES_LEFT) {
             int len_offset = find_bitstream_len_offset(buffer, bufsize);
             if (len_offset >= 0) {
                 gpio_put(26, 1); // LED off
+                fpga_program_init(CONFIG.fpga_prog_speed);
                 fpga_program_setup1(); // nprog low to erase
                 // board_millis() seems to not work properly (we're in an interrupt?)
                 for (volatile uint32_t i = 0; i < 5000; i++);
-                fpga_program_setup2();
+                fpga_program_setup2(); // nprog back high
+                for (volatile uint32_t i = 0; i < 5000; i++); // need to wait a bit after this before we start programming, 5ms from datasheet info
                 FPGA_PROG_BYTES_LEFT = BE_4U8_TO_U32(buffer + len_offset);
                 FPGA_PROG_BYTES_LEFT += len_offset;
 
                 bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
                 fpga_program_sendchunk(buffer, bufsize);
                 FPGA_PROG_BYTES_LEFT -= bufsize;
+
+                if (CONFIG.prog_flash) {
+                    bitstream_init_spi(CONFIG.flash_prog_speed);
+                    while (spi_flash_is_busy());
+                    spi_flash_64k_erase_nonblocking(FPGA_CURRENT_OFFSET); // todo add different index options to flash
+                    bufsize = min(bufsize, (CONST_64k - SPI_FLASH_BUF_INDEX));
+                    memcpy(SPI_FLASH_WRITE_BUF + SPI_FLASH_BUF_INDEX, buffer, bufsize);
+
+                    SPI_FLASH_BUF_INDEX += bufsize;
+                }
             }
+
         } else {
             // this should be okay for now, may rework to follow file table to handle
             // writing to multiple files at a time
             bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
             fpga_program_sendchunk(buffer, bufsize);
             FPGA_PROG_BYTES_LEFT -= bufsize;
+            if (CONFIG.prog_flash) {
+                bitstream_init_spi(CONFIG.flash_prog_speed);
+                if (!SPI_FLASH_BUF_INDEX) {
+                    while (spi_flash_is_busy());
+                    spi_flash_64k_erase_nonblocking(FPGA_CURRENT_OFFSET); // todo add different index options to flash
+                }
+
+                // write into buffer, but not past
+                bufsize = min(bufsize, (CONST_64k - SPI_FLASH_BUF_INDEX));
+                memcpy(SPI_FLASH_WRITE_BUF + SPI_FLASH_BUF_INDEX, buffer, bufsize);
+
+                SPI_FLASH_BUF_INDEX += bufsize;
+
+                if ((SPI_FLASH_BUF_INDEX) >= CONST_64k) { 
+                    // if we've maxed out the buffer, start write
+                    while (spi_flash_is_busy());
+                    uint32_t i = 0;
+                    while (i < (SPI_FLASH_BUF_INDEX)) {
+                        uint16_t write_len = min(256, SPI_FLASH_BUF_INDEX - i); // can write up to 256 bytes at a time
+                        spi_flash_page_program_blocking(i, SPI_FLASH_WRITE_BUF + i, write_len - 1); // do the write
+                        i += write_len;
+                    }
+                } 
+            }
         }
     }
 

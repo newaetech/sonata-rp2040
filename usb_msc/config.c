@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "config.h"
 #include "util.h"
 
@@ -20,22 +21,51 @@ uint8_t *get_config_opt_int(uint8_t *str, enum config_options_int *opt)
         if (cmp = strncmp(str, FPGA_PROG_SPEED_STR, sizeof(FPGA_PROG_SPEED_STR) - 1), !cmp) {
             *opt = CONF_FPGA_PROG_SPEED;
             // str += sizeof(FPGA_PROG_SPEED_STR); //advance past 
-            return strchr(str, '=') + 1; // return pointer str after =
+            return strchr(str, '='); // return pointer str after =
         }
         if (cmp = strncmp(str, FLASH_PROG_SPEED_STR, sizeof(FLASH_PROG_SPEED_STR) - 1), !cmp) {
             *opt = CONF_FLASH_PROG_SPEED;
             // str += sizeof(FLASH_PROG_SPEED_STR);
-            return strchr(str, '=') + 1;
+            return strchr(str, '=');
         }
         if (cmp = strncmp(str, PROG_FLASH_STR, sizeof(PROG_FLASH_STR) - 1), !cmp) {
             *opt = CONF_PROG_FLASH;
             // str += sizeof(PROG_FLASH_STR);
-            return strchr(str, '=') + 1;
+            return strchr(str, '=');
         }
     }
 
     // didn't find anything, return NULL
     return NULL;
+}
+
+int write_config_to_file(struct fat_filesystem *fs, struct config_options *opts)
+{
+    struct directory_entry info;
+    int32_t err = get_file_info(fs, 0, "OPTIONS", &info);
+    if (err) return -1;
+
+    uint16_t file_cluster = LE_2U8_TO_U16(info.starting_cluster);
+    // uint32_t file_size = LE_4U8_TO_U32(info.file_size);
+    if (file_cluster < 2) return -1;
+    uint8_t *data = fs->clusters[file_cluster - 2];
+    char flash_str_opts[][4] = {"NO", "YES"};
+
+    // TODO: maybe make this more automated in the future?
+    int file_size = snprintf(data, DISK_SECTOR_SIZE - 1, 
+        "%s=%lu\r\n"\
+        "%s=%lu\r\n"\
+        "%s=%s\r\n",
+        FPGA_PROG_SPEED_STR, opts->fpga_prog_speed,
+        FLASH_PROG_SPEED_STR, opts->flash_prog_speed,
+        PROG_FLASH_STR, flash_str_opts[opts->prog_flash]
+    );
+
+    uint8_t file_size_arr[] = {LE_U32_TO_4U8(file_size)};
+    memcpy(info.file_size, file_size_arr, sizeof(file_size_arr));
+    err = write_file_info(fs, 0, "OPTIONS", &info);
+    if (err) return -1;
+    return 0;
 }
 
 /*
@@ -67,6 +97,7 @@ int parse_config(struct fat_filesystem *fs, struct config_options *opts)
     while (cur_line) {
         cur_line = get_config_opt_int(cur_line, &cur_opt);
         if (!cur_line) break; // all done
+        cur_line++; //advance beyond '='
         switch (cur_opt) {
             case CONF_FPGA_PROG_SPEED:
                 opts->fpga_prog_speed = strtoul(cur_line, NULL, 0);

@@ -20,11 +20,12 @@ enum spi_flash_status1 {
 int spi_flash_read(uint32_t addr, uint8_t *data, uint32_t len); // use fast read?
 
 // writes always go from addr to page end
-int spi_flash_page_program_blocking(uint32_t addr, uint8_t *data, uint8_t len);
+int spi_flash_page_program_blocking(uint32_t addr, uint8_t *data, uint16_t len);
 int spi_flash_sector_erase_blocking(uint32_t addr);
 void bitstream_init_spi(uint32_t baud);
 void firmware_init_spi(uint32_t baud);
 int spi_flash_is_busy(void);
-int spi_flash_poll_status(uint8_t and_match);
 int spi_flash_64k_erase_nonblocking(uint32_t addr);
+// int spi_flash_poll_busy(void);
+// int spi_flash_poll_write_enable(void);
 enum spi_flash_status1 spi_flash_read_status(void);

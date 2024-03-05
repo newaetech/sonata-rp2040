@@ -25,11 +25,25 @@ dma_channel_config fpga_dma_config;
 int fpga_dma = -1;
 
 
-void fpga_program_init(void)
+void fpga_program_init(uint32_t baud)
 {
     // set prog high
     FPGA_NPROG_SETUP();
     FPGA_NPROG_HIGH();
+
+    FPGA_DONE_PIN_SETUP();
+
+    spi_deinit(spi1);
+    spi_init(spi1, baud);
+
+    gpio_set_function(11, GPIO_FUNC_SPI); // TX pin
+    gpio_set_function(10, GPIO_FUNC_SPI); // CLK pin
+    // gpio_set_slew_rate(11, GPIO_SLEW_RATE_FAST);
+    // gpio_set_slew_rate(10, GPIO_SLEW_RATE_FAST);
+
+    // gpio_set_drive_strength(11, GPIO_DRIVE_STRENGTH_12MA);
+    // gpio_set_drive_strength(10, GPIO_DRIVE_STRENGTH_12MA);
+    gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
 }
 
 void fpga_program_setup1(void)
@@ -55,6 +69,8 @@ void fpga_program_finish(void)
     0xFFFFFFFF's are NOP
     0x000000BB and 0x11220044 are sync words
 
+    Bitstream length should be preceeded by 0x65
+
 */
 int find_bitstream_len_offset(uint8_t *bitstream, uint16_t len)
 {
@@ -79,13 +95,15 @@ int find_bitstream_len_offset(uint8_t *bitstream, uint16_t len)
     }
     header_end_loc--;
     while (bitstream[header_end_loc] == 0xFF) header_end_loc--;
+    if (header_end_loc <= 3) return -1;
+    header_end_loc -= 4; // if bitstream doesn't end in 0xFF, this should get us to 0x65 before
+    header_end_loc++; // then advance one ahead to get length
+    return header_end_loc;
+
     // work backwards to find len
     // for (; header_end_loc > 0; header_end_loc -= 4) {
     //     if (bitstream[header_end_loc] != 0xFF) break;
     // }
-    if (header_end_loc <= 4) return -1;
-
-    return header_end_loc - 4;
 }
 
 void fpga_init_dma(void)

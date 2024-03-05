@@ -133,9 +133,15 @@ uint16_t spi_flash_read_id(void)
 }
 
 /*
-    Poll SPI flash until bits specified by and_match are 0
+    WARNING: You're supposed to be able to continuously read the status register
+    like we're doing below by keeping CS low and doing SPI reads, but this doesn't
+    appear to work (status will be 0x00 even if the device is busy, for example)
 */
-int spi_flash_poll_status(enum spi_flash_status1 and_match)
+#if 0
+/*
+    Poll SPI flash until the device is ready for an operation
+*/
+int spi_flash_poll_busy(void)
 {
     uint8_t cmd = SPI_CMD_READ_STATUS1;
     uint8_t rtn = 0;
@@ -144,7 +150,7 @@ int spi_flash_poll_status(enum spi_flash_status1 and_match)
 
     spi_write_blocking(flash_spi, &cmd, 1);
 
-    while (!(rtn & and_match)) {
+    while (rtn & SPI_FLASH_STATUS_BUSY) {
         spi_read_blocking(flash_spi, 0x00, &rtn, 1);
     }
     gpio_put(SPI_FLASH_CS_PIN, 1);
@@ -153,11 +159,37 @@ int spi_flash_poll_status(enum spi_flash_status1 and_match)
 }
 
 /*
+    Poll SPI flash until the device has writes/erases enabled
+*/
+int spi_flash_poll_write_enable(void)
+{
+    uint8_t cmd = SPI_CMD_READ_STATUS1;
+    uint8_t rtn = 0;
+
+    gpio_put(SPI_FLASH_CS_PIN, 0);
+
+    spi_write_blocking(flash_spi, &cmd, 1);
+
+    while (!(rtn & SPI_FLASH_WRITE_ENABLED)) {
+        spi_read_blocking(flash_spi, 0x00, &rtn, 1);
+    }
+    gpio_put(SPI_FLASH_CS_PIN, 1);
+
+    return 0;
+}
+#endif
+
+/*
     Check if SPI flash is busy (usually doing an erase or write)
 */
 int spi_flash_is_busy(void) 
 {
     return spi_flash_read_status() & SPI_FLASH_STATUS_BUSY;
+}
+
+int spi_flash_is_write_enabled(void)
+{
+    return spi_flash_read_status() & SPI_FLASH_WRITE_ENABLED;
 }
 
 /*
@@ -191,7 +223,7 @@ int spi_flash_write_enable(void)
     gpio_put(SPI_FLASH_CS_PIN, 1);
 
     // check that write enable status is set
-    spi_flash_poll_status(SPI_FLASH_WRITE_ENABLED);
+    while (!spi_flash_is_write_enabled());
 
     return 0;
 }
@@ -216,7 +248,8 @@ int spi_flash_sector_erase_blocking(uint32_t addr)
     gpio_put(SPI_FLASH_CS_PIN, 1);
 
     // wait for erase to finish
-    spi_flash_poll_status(SPI_FLASH_STATUS_BUSY);
+    // spi_flash_poll_busy();
+    while (spi_flash_is_busy());
     return 0;
 }
 
@@ -246,7 +279,7 @@ int spi_flash_64k_erase_nonblocking(uint32_t addr)
 */
 int spi_flash_read(uint32_t addr, uint8_t *data, uint32_t len)
 {
-    uint8_t cmd = SPI_CMD_READ_DATA_4ADDR_FAST;
+    uint8_t cmd = SPI_CMD_READ_DATA_4ADDR;
     uint8_t addr_u8[] = {BE_U32_TO_4U8(addr)}; // ensure proper endianness
 
     gpio_put(SPI_FLASH_CS_PIN, 0);
@@ -255,8 +288,8 @@ int spi_flash_read(uint32_t addr, uint8_t *data, uint32_t len)
     spi_write_blocking(flash_spi, addr_u8, 4);
 
     // need a dummy byte for fast read
-    cmd = 0x00;
-    spi_write_blocking(flash_spi, &cmd, 1); 
+    // cmd = 0x00;
+    // spi_write_blocking(flash_spi, &cmd, 1); 
 
     spi_read_blocking(flash_spi, 0x00, data, len);
 
@@ -274,10 +307,10 @@ int spi_flash_read(uint32_t addr, uint8_t *data, uint32_t len)
     on byte 0-255 cannot continue on to byte 256+. If this function is specified to
     write beyond a page boundary, the attempt will be aborted and -1 will be returned.
 */
-int spi_flash_page_program_blocking(uint32_t addr, uint8_t *data, uint8_t len)
+int spi_flash_page_program_blocking(uint32_t addr, uint8_t *data, uint16_t len)
 {
     uint16_t write_len = len;
-    write_len++;
+    // write_len++;
 
     // addr & 0x100 should be start of page, so +0x100 should be next page
     if ((addr + write_len) > ((addr & 0x100) + 0x100)) return -1; // ensure write does not go past end of page
@@ -292,12 +325,13 @@ int spi_flash_page_program_blocking(uint32_t addr, uint8_t *data, uint8_t len)
 
     spi_write_blocking(flash_spi, addr_u8, 4);
 
-    spi_write_blocking(flash_spi, data, len + 1);
+    spi_write_blocking(flash_spi, data, len);
 
     gpio_put(SPI_FLASH_CS_PIN, 1);
 
     // wait for write to finish
-    spi_flash_poll_status(SPI_FLASH_STATUS_BUSY);
+    // spi_flash_poll_busy();
+    while (spi_flash_is_busy());
 
     return 0;
 }
