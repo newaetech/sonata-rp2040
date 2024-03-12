@@ -18,6 +18,7 @@
 #include "config.h"
 #include "flash_util.h"
 #include "util.h"
+#include "error.h"
 
 #define spi_default PICO_DEFAULT_SPI_INSTANCE
 #define FPGA_CONFIG_LED 18
@@ -55,6 +56,24 @@ extern struct config_options CONFIG;
 uint8_t test_rdmem[256];
 uint8_t test_mem[256];
 
+uint32_t xorshift_state = 0xF2BB9566;
+
+uint32_t xorshift(void)
+{
+  xorshift_state ^= xorshift_state << 13;
+  xorshift_state ^= xorshift_state >> 17;
+  xorshift_state ^= xorshift_state << 5;
+  return xorshift_state;
+}
+
+void fill_buf(uint8_t *buf, uint16_t len)
+{
+    for (uint16_t i = 0; i < (len - 3); i += 4) {
+        uint32_t current = xorshift();
+        memcpy(buf + i, &current, 4);
+    }
+}
+
 int test_spi_flash_prog(void)
 {
     for (uint32_t i = 0; i < ARR_LEN(test_mem); i++) test_mem[i] = i;
@@ -67,11 +86,17 @@ int test_spi_flash_prog(void)
       }
     }
 
-    spi_flash_page_program_blocking(0x00, test_mem, ARR_LEN(test_mem));
-    spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
+    for (uint16_t i = 0; i < CONST_4k; i += 256) {
+        fill_buf(test_mem, 256);
+        spi_flash_page_program_blocking(i, test_mem, ARR_LEN(test_mem));
+        spi_flash_read(i, test_rdmem, ARR_LEN(test_rdmem));
+        if (memcmp(test_mem, test_rdmem, sizeof(test_rdmem))) return -i;
+    }
+    return 0;
 
-    if (memcmp(test_mem, test_rdmem, sizeof(test_rdmem))) return -2;
 }
+
+uint32_t flash_calc_crc32(uint32_t addr);
 
 uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
@@ -91,11 +116,24 @@ int main()
     board_init();
     tud_init(BOARD_TUD_RHPORT);
     spi_init(spi1, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
-    bitstream_init_spi(10E6);
-    test_spi_flash_prog();
 
-    bitstream_init_spi(10E6);
-    test_spi_flash_prog();
+    bitstream_init_spi(20E6);
+    // spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
+    // volatile int offset = find_bitstream_len_offset(test_rdmem, ARR_LEN(test_rdmem));
+    uint32_t bscrc = flash_calc_crc32(0x00);
+
+    // test_spi_flash_prog();
+    if (bscrc > 0) {
+      print_err_file(get_filesystem(), "bitstream in flash, CRC = %lX\r\n", bscrc);
+    } else {
+      print_err_file(get_filesystem(), "no bitstream in flash\r\n");
+    }
+    // print_err_file(get_filesystem(), "test print %d", (int)128);
+    // bitstream_init_spi(1E6);
+    // test_spi_flash_prog();
+
+    // bitstream_init_spi(10E6);
+    // test_spi_flash_prog();
 
     // volatile uint16_t dev_id = spi_flash_read_id();
 

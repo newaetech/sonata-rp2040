@@ -39,6 +39,11 @@ enum spi_flash_commands {
 
 const uint32_t BITSTREAM_FLASH_OFFSETS[] = {0x00, 0x00, 0x00};
 
+void delay_short(void)
+{
+    for (volatile uint32_t i = 0; i < 50; i++);
+}
+
 // each bitstream 32MB apart
 #define BITSTREAM_FLASH_OFFSET 0x2000000
 
@@ -64,6 +69,22 @@ enum firmware_spi_pins {
 
 int SPI_FLASH_CS_PIN = 0;
 
+void enter_4byte_mode(void)
+{
+    uint8_t cmd = SPI_CMD_ENTER_4BYTE_ADDR_MODE;
+    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_write_blocking(flash_spi, &cmd, 1);
+    gpio_put(SPI_FLASH_CS_PIN, 1);
+
+}
+
+void spi_cs_put(uint8_t val)
+{
+    delay_short();
+    gpio_put(SPI_FLASH_CS_PIN, val);
+    delay_short();
+}
+
 /*
     Enable bistream spi flash IO, disable firmware IO, and (re)initialize SPI peripheral
 */
@@ -87,6 +108,8 @@ void bitstream_init_spi(uint32_t baud)
     gpio_set_dir(BS_SPI_CS, GPIO_OUT);
     gpio_put(BS_SPI_CS, 1);
     SPI_FLASH_CS_PIN = BS_SPI_CS;
+
+    enter_4byte_mode();
 }
 
 /*
@@ -122,12 +145,12 @@ uint16_t spi_flash_read_id(void)
     uint8_t cmd = 0x90;
     uint16_t read_data = 0;
 
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_cs_put(0);
     spi_write_blocking(flash_spi, &cmd, 1);
 
     spi_read_blocking(flash_spi, 0x00, (void *)&read_data, 2); // dummy read
     spi_read_blocking(flash_spi, 0x00, (void *)&read_data, 2);
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
 
     return read_data;
 }
@@ -146,14 +169,14 @@ int spi_flash_poll_busy(void)
     uint8_t cmd = SPI_CMD_READ_STATUS1;
     uint8_t rtn = 0;
 
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_cs_put(0);
 
     spi_write_blocking(flash_spi, &cmd, 1);
 
     while (rtn & SPI_FLASH_STATUS_BUSY) {
         spi_read_blocking(flash_spi, 0x00, &rtn, 1);
     }
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
 
     return 0;
 }
@@ -166,14 +189,14 @@ int spi_flash_poll_write_enable(void)
     uint8_t cmd = SPI_CMD_READ_STATUS1;
     uint8_t rtn = 0;
 
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_cs_put(0);
 
     spi_write_blocking(flash_spi, &cmd, 1);
 
     while (!(rtn & SPI_FLASH_WRITE_ENABLED)) {
         spi_read_blocking(flash_spi, 0x00, &rtn, 1);
     }
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
 
     return 0;
 }
@@ -200,12 +223,12 @@ enum spi_flash_status1 spi_flash_read_status(void)
     uint8_t cmd = SPI_CMD_READ_STATUS1;
     uint8_t rtn = 0;
 
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_cs_put(0);
 
     spi_write_blocking(flash_spi, &cmd, 1);
     spi_read_blocking(flash_spi, 0x00, &rtn, 1);
 
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
 
     return rtn;
 }
@@ -218,9 +241,9 @@ enum spi_flash_status1 spi_flash_read_status(void)
 int spi_flash_write_enable(void)
 {
     uint8_t cmd = SPI_CMD_WRITE_ENABLE;
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_cs_put(0);
     spi_write_blocking(flash_spi, &cmd, 1);
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
 
     // check that write enable status is set
     while (!spi_flash_is_write_enabled());
@@ -240,12 +263,12 @@ int spi_flash_sector_erase_blocking(uint32_t addr)
 
     if (spi_flash_write_enable()) return -1;
 
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_cs_put(0);
     spi_write_blocking(flash_spi, &cmd, 1);
 
     spi_write_blocking(flash_spi, addr_u8, 4);
 
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
 
     // wait for erase to finish
     // spi_flash_poll_busy();
@@ -264,12 +287,14 @@ int spi_flash_64k_erase_nonblocking(uint32_t addr)
     uint8_t cmd = SPI_CMD_64K_BLOCK_ERASE;
     uint8_t addr_u8[] = {BE_U32_TO_4U8(addr)}; // ensure proper endianness
 
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    if (spi_flash_write_enable()) return -1;
+
+    spi_cs_put(0);
 
     spi_write_blocking(flash_spi, &cmd, 1);
     spi_write_blocking(flash_spi, addr_u8, 4);
 
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
 
     return 0;
 }
@@ -282,7 +307,7 @@ int spi_flash_read(uint32_t addr, uint8_t *data, uint32_t len)
     uint8_t cmd = SPI_CMD_READ_DATA_4ADDR;
     uint8_t addr_u8[] = {BE_U32_TO_4U8(addr)}; // ensure proper endianness
 
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_cs_put(0);
     spi_write_blocking(flash_spi, &cmd, 1);
 
     spi_write_blocking(flash_spi, addr_u8, 4);
@@ -293,7 +318,7 @@ int spi_flash_read(uint32_t addr, uint8_t *data, uint32_t len)
 
     spi_read_blocking(flash_spi, 0x00, data, len);
 
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
 
     return 0;
 }
@@ -312,22 +337,22 @@ int spi_flash_page_program_blocking(uint32_t addr, uint8_t *data, uint16_t len)
     uint16_t write_len = len;
     // write_len++;
 
-    // addr & 0x100 should be start of page, so +0x100 should be next page
-    if ((addr + write_len) > ((addr & 0x100) + 0x100)) return -1; // ensure write does not go past end of page
+    // addr & ~0xFF should be start of page, so +0x100 should be next page
+    if ((addr + (uint32_t)write_len) > ((addr & ~(uint32_t)0xFF) + (uint32_t)0x100)) return -1; // ensure write does not go past end of page
 
     uint8_t cmd = SPI_CMD_PAGE_4ADDR_PROGRAM;
     uint8_t addr_u8[] = {BE_U32_TO_4U8(addr)}; // ensure proper endianness
 
     if (spi_flash_write_enable()) return -1; // ensure write is enabled
 
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_cs_put(0);
     spi_write_blocking(flash_spi, &cmd, 1);
 
     spi_write_blocking(flash_spi, addr_u8, 4);
 
     spi_write_blocking(flash_spi, data, len);
 
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
 
     // wait for write to finish
     // spi_flash_poll_busy();

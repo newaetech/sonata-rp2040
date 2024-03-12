@@ -29,11 +29,12 @@ static struct fat_filesystem FILESYSTEM = {
                 0xFF, 0xFF, // End of chain indicator (reserved cluster?)
                 0xFF, 0xFF, // cluster 2 (README.txt in our case)
                 0xFF, 0xFF, // cluster 3 (OPTIONS.txt in our case)
+                0xFF, 0xFF, // cluster 4 (ERROR.txt in our case)
             }},
     .root_dir = {{
                     .filename = {'S', 'O', 'N', 'A', 'T', 'A', ' ', ' '}, // name
                     .extension = {' ', ' ', ' '},
-                    .attribute = 0x08, // volume label
+                    .attribute = FAT_DIR_VOL_LABEL, // volume label
                     .time_stamp = {0x4F, 0x6D},
                     .date_stamp = {0x65, 0x43}
                 },
@@ -50,6 +51,14 @@ static struct fat_filesystem FILESYSTEM = {
                     .creation_date = {0x65, 0x43}, .last_access_date = {0x65, 0x43}, 
                     .time_stamp = {0x88, 0x6D}, .date_stamp = {0x65, 0x43}, 
                     .starting_cluster = {0x03, 0x00}, .file_size = {LE_U32_TO_4U8(sizeof(OPTIONS_CONTENTS) - 1)}
+                },
+                {
+                    .filename = {'E', 'R', 'R', 'O', 'R', ' ', ' ', ' '}, 
+                    .extension = {'T', 'X', 'T'}, .creation_time = {0x52, 0x6D},
+                    .creation_date = {0x65, 0x43}, .last_access_date = {0x65, 0x43}, 
+                    .time_stamp = {0x88, 0x6D}, .date_stamp = {0x65, 0x43}, 
+                    .attribute = FAT_DIR_READ_ONLY,
+                    .starting_cluster = {0x04, 0x00}, .file_size = {LE_U32_TO_4U8(DISK_CLUSTER_SIZE)}
                 }
                 },
     .clusters = {{README_CONTENTS}, {OPTIONS_CONTENTS}, {}}

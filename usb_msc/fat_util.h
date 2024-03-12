@@ -65,6 +65,10 @@ static uint32_t sector_to_cluster(uint32_t sector)
     "\r\n" \
     ""
 
+#define ERROR_CONTENTS \
+    "\r\n" \
+    ""
+
 #pragma pack(push, 1)
 struct boot_sector {
     union {

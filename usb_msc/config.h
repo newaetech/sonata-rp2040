@@ -4,9 +4,9 @@
 #include <fat_util.h>
 
 enum config_defaults {
-    CONF_DEFAULT_FPGA_PROG_SPEED = (int)5E6,
-    CONF_DEFAULT_FLASH_PROG_SPEED = (int)5E6,
-    CONF_DEFAULT_PROG_FLASH = false
+    CONF_DEFAULT_FPGA_PROG_SPEED = (int)20E6,
+    CONF_DEFAULT_FLASH_PROG_SPEED = (int)20E6,
+    CONF_DEFAULT_PROG_FLASH = true
 };
 
 #define MAX_CONFIG_NAME_LEN 32

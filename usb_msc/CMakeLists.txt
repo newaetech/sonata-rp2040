@@ -9,6 +9,8 @@ target_sources(usb_msc PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/fat_util.c
         ${CMAKE_CURRENT_LIST_DIR}/flash_util.c
         ${CMAKE_CURRENT_LIST_DIR}/config.c
+        ${CMAKE_CURRENT_LIST_DIR}/error.c
+        ${CMAKE_CURRENT_LIST_DIR}/crc32.c
         )
 
 target_include_directories(usb_msc PUBLIC

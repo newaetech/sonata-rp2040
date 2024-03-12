@@ -29,3 +29,13 @@ int spi_flash_64k_erase_nonblocking(uint32_t addr);
 // int spi_flash_poll_busy(void);
 // int spi_flash_poll_write_enable(void);
 enum spi_flash_status1 spi_flash_read_status(void);
+
+inline uint32_t sector_alignment(uint32_t addr)
+{
+    return addr & 0xFFF;
+}
+
+inline uint32_t block_alignment64k(uint32_t addr)
+{
+    return addr & 0xFFFF;
+}
