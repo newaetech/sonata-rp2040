@@ -9,6 +9,7 @@
 // GPIO10 = FPGA CCLK = SPI1 SCK
 // GPIO11 = FPGA Data
 // data pin can be 11, 15, 27
+#define FPGA_CONFIG_LED 18
 
 void fpga_program_sendbyte(uint8_t databyte)
 {
@@ -44,6 +45,12 @@ void fpga_program_init(uint32_t baud)
     // gpio_set_drive_strength(11, GPIO_DRIVE_STRENGTH_12MA);
     // gpio_set_drive_strength(10, GPIO_DRIVE_STRENGTH_12MA);
     gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
+
+    gpio_init(FPGA_CONFIG_LED); // LED0 // note should be LED3 at somepoint
+    gpio_set_dir(FPGA_CONFIG_LED, GPIO_OUT);
+
+    FPGA_DONE_PIN_SETUP();
+    FPGA_NPROG_SETUP();
 }
 
 void fpga_program_setup1(void)
@@ -62,6 +69,14 @@ void fpga_program_finish(void)
     // no op
 }
 
+void fpga_erase(void)
+{
+    fpga_program_setup1(); // nprog low to erase
+    // board_millis() seems to not work properly (not done by interrupt?)
+    for (volatile uint32_t i = 0; i < 10000; i++);
+    fpga_program_setup2(); // nprog back high
+    for (volatile uint32_t i = 0; i < 10000; i++); // need to wait a bit after this before we start programming, 5ms from datasheet info
+}
 
 // should be offset 120 i think
 /*
@@ -104,6 +119,18 @@ int find_bitstream_len_offset(uint8_t *bitstream, uint16_t len)
     // for (; header_end_loc > 0; header_end_loc -= 4) {
     //     if (bitstream[header_end_loc] != 0xFF) break;
     // }
+}
+
+uint32_t get_bitstream_length(uint8_t *bitstream, uint16_t len)
+{
+    int len_offset = find_bitstream_len_offset(bitstream, len);
+    if (len_offset < 0) return 0;
+
+    uint32_t bs_len = BE_4U8_TO_U32(bitstream + len_offset); // length of everything after the size in the header
+    bs_len += len_offset; // add in header
+    bs_len += 4; // and the size
+
+    return bs_len;
 }
 
 void fpga_init_dma(void)

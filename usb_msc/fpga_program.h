@@ -38,3 +38,5 @@ int32_t fpga_send_dma(uint8_t *buf, uint16_t len);
 
 int is_fpga_dma_ready(void);
 int fpga_program_sendchunk(uint8_t *data, uint32_t len);
+uint32_t get_bitstream_length(uint8_t *bitstream, uint16_t len);
+void fpga_erase(void);

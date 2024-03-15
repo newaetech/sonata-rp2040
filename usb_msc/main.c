@@ -99,6 +99,7 @@ int test_spi_flash_prog(void)
 uint32_t flash_calc_crc32(uint32_t addr);
 
 uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
+extern uint8_t FLASH_WRITE_BUF[CONST_64k];
 
 int main() 
 {
@@ -116,17 +117,46 @@ int main()
     board_init();
     tud_init(BOARD_TUD_RHPORT);
     spi_init(spi1, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
+    spi_init(spi0, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
 
     bitstream_init_spi(20E6);
     // spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
     // volatile int offset = find_bitstream_len_offset(test_rdmem, ARR_LEN(test_rdmem));
-    uint32_t bscrc = flash_calc_crc32(0x00);
+    // spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
+    // uint32_t bscrc = flash_calc_crc32(0x00);
+    spi_flash_read(0x00, FLASH_WRITE_BUF, 256); // whatever, just duplicate the reads...
+    uint32_t bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
 
     // test_spi_flash_prog();
-    if (bscrc > 0) {
-      print_err_file(get_filesystem(), "bitstream in flash, CRC = %lX\r\n", bscrc);
+    if (bs_len > 0) {
+      // spi_flash_read(0x00, FLASH_WRITE_BUF, 256); // whatever, just duplicate the reads...
+      fpga_program_init(20E6);
+      fpga_erase();
+      // uint32_t bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
+      print_err_file(get_filesystem(), "bitstream in flash, CRC = %lX, programming %lX bytes...\r\n", 0, bs_len);
+      uint32_t flash_addr = 0x00;
+      while (bs_len) {
+        uint32_t read_len = min(sizeof(FLASH_WRITE_BUF), bs_len);
+        spi_flash_read(flash_addr, FLASH_WRITE_BUF, read_len);
+        fpga_program_sendchunk(FLASH_WRITE_BUF, read_len);
+        bs_len -= read_len;
+        flash_addr += read_len;
+        print_err_file(get_filesystem(), "Prog %lX bytes, %lX left\r\n", read_len, bs_len);
+      }
     } else {
-      print_err_file(get_filesystem(), "no bitstream in flash\r\n");
+      print_err_file(get_filesystem(), "no bitstream in flash, testing flash...\r\n");
+      int result = test_spi_flash_prog();
+      switch (result) {
+        case 0:
+          print_err_file(get_filesystem(), "Flash passed\r\n");
+          break;
+        case -1:
+          print_err_file(get_filesystem(), "Flash erase failed\r\n");
+          break;
+        default:
+          print_err_file(get_filesystem(), "Program failed at %i", result);
+          break;
+      }
     }
     // print_err_file(get_filesystem(), "test print %d", (int)128);
     // bitstream_init_spi(1E6);
@@ -137,15 +167,15 @@ int main()
 
     // volatile uint16_t dev_id = spi_flash_read_id();
 
-    gpio_set_function(11, GPIO_FUNC_SPI); // TX pin
-    gpio_set_function(10, GPIO_FUNC_SPI); // CLK pin
-    gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
+    // gpio_set_function(11, GPIO_FUNC_SPI); // TX pin
+    // gpio_set_function(10, GPIO_FUNC_SPI); // CLK pin
+    // gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
 
     gpio_init(FPGA_CONFIG_LED); // LED0 // note should be LED3 at somepoint
     gpio_set_dir(FPGA_CONFIG_LED, GPIO_OUT);
 
-    FPGA_DONE_PIN_SETUP();
-    FPGA_NPROG_SETUP();
+    // FPGA_DONE_PIN_SETUP();
+    // FPGA_NPROG_SETUP();
 
     // test_spi_flash_prog();
 
