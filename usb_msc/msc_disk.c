@@ -145,6 +145,8 @@ uint32_t BITSTREAM_CRC32 = 0;
 
 uint32_t BLOCK_COUNTER = 0;
 
+// uint8_t LAST_SECTOR[DISK_CLUSTER_SIZE];
+
 uint32_t flash_calc_crc32(uint32_t addr)
 {
     spi_flash_read(addr, TEST_RD_BUF, 256);
