@@ -54,12 +54,10 @@ static uint32_t sector_to_cluster(uint32_t sector)
 // NOTE: keep this under 512 bytes as using multiple blocks is kind of a pain
 #define README_CONTENTS                                            \
     "See the following notes:\r\n" \
-    "\t1. Copy bitstreams or firmware into this directory to program\r\n" \
-    "\t2. Firmware must be in the Intel hex format\r\n" \
-    "\t3. If the transferred file begins with ':' and the checksum of the first line matches, the file is assumed to be firmware\r\n" \
-    "\t4. Otherwise, if the transferred file contains the magic sequence 0x000000BB, 0x11220044, it is assumed to be a bitstream\r\n" \
-    "\t5. If neither is true, nothing will be written\r\n" \
-    "\t6. Programming options can be modified by changing options.txt\r\n" \
+    "\t1. Copy bitstreams into this directory to program\r\n" \
+    "\t2. If the transferred file contains the magic sequence 0x000000BB, 0x11220044, it is assumed to be a bitstream\r\n" \
+    "\t3. Programming options can be modified by changing options.txt\r\n" \
+    "\t4. See https://github.com/newaetech/sonata-rp2040/blob/main/README.md for more information\r\n" \
     ""
 
 #define OPTIONS_CONTENTS \
