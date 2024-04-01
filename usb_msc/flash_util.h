@@ -26,9 +26,13 @@ void bitstream_init_spi(uint32_t baud);
 void firmware_init_spi(uint32_t baud);
 int spi_flash_is_busy(void);
 int spi_flash_64k_erase_nonblocking(uint32_t addr);
+void enter_4byte_mode(void);
 // int spi_flash_poll_busy(void);
 // int spi_flash_poll_write_enable(void);
 enum spi_flash_status1 spi_flash_read_status(void);
+int spi_flash_chip_erase_blocking(void);
+void spi_write_extended_addr_reg(uint8_t addr);
+uint8_t spi_read_extended_addr_reg(void);
 
 inline uint32_t sector_alignment(uint32_t addr)
 {

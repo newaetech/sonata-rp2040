@@ -26,12 +26,11 @@
 #define STATEA_LED 26
 #define STATEB_LED 25
 
-#define GPIO_SW0 29
-#define GPIO_SW1 28
-#define GPIO_SW2 27
+uint8_t USER_LEDS[] = {26, 25, 24};
+uint8_t BITSTREAM_SELECT_PINS[] = {29, 28, 27};
 
 // TODO
-#define ERR_LED 26
+// #define ERR_LED 26
 
 /* Blink pattern
  * - 250 ms  : device not mounted
@@ -58,6 +57,9 @@ uint8_t test_mem[256];
 
 uint32_t xorshift_state = 0xF2BB9566;
 
+/*
+Basic RNG func
+*/
 uint32_t xorshift(void)
 {
   xorshift_state ^= xorshift_state << 13;
@@ -66,6 +68,9 @@ uint32_t xorshift(void)
   return xorshift_state;
 }
 
+/*
+Fill buff randomly
+*/
 void fill_buf(uint8_t *buf, uint16_t len)
 {
     for (uint16_t i = 0; i < (len - 3); i += 4) {
@@ -74,6 +79,9 @@ void fill_buf(uint8_t *buf, uint16_t len)
     }
 }
 
+/*
+Test function to erase, program, and read back "random" mem from spi flash
+*/
 int test_spi_flash_prog(void)
 {
     for (uint32_t i = 0; i < ARR_LEN(test_mem); i++) test_mem[i] = i;
@@ -101,40 +109,83 @@ uint32_t flash_calc_crc32(uint32_t addr);
 uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 extern uint8_t FLASH_WRITE_BUF[CONST_64k];
 
+int FLASH_BITSTREAM_SELECT = 0;
+uint32_t FLASH_BITSTREAM_OFFSET[] = {0x00, 10*1024*1024, 10*2*1024*1024};
+
+/*
+Figure out which bitstream is selected from pins
+*/
+int read_bitstream_select_pins(void)
+{
+    for (uint8_t i = 0; i < ARR_LEN(BITSTREAM_SELECT_PINS); i++) {
+      if (!gpio_get(BITSTREAM_SELECT_PINS[i])) {
+        return i;
+      }
+    }
+
+    return 0;
+}
+
+void setup_bitstream_select_pin(void)
+{
+    for (uint8_t i = 0; i < ARR_LEN(BITSTREAM_SELECT_PINS); i++) {
+      gpio_init(BITSTREAM_SELECT_PINS[i]);
+      gpio_set_dir(BITSTREAM_SELECT_PINS[i], GPIO_IN);
+      gpio_pull_up(BITSTREAM_SELECT_PINS[i]);
+    }
+}
+
+/*
+Get the bitstream offset based on the switch selected on the board
+*/
+uint32_t flash_get_bitstream_offset(void)
+{
+    int pin = read_bitstream_select_pins();
+    if (pin > 2) return 0;
+
+    return FLASH_BITSTREAM_OFFSET[pin];
+}
+
 int main() 
 {
     const uint LED_PIN = 24; // LED1
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
+    setup_bitstream_select_pin();
 
-    gpio_init(STATEA_LED);
-    gpio_set_dir(STATEA_LED, GPIO_OUT);
-    gpio_init(STATEB_LED);
-    gpio_set_dir(STATEB_LED, GPIO_OUT);
-    gpio_put(25, 0);
-    gpio_put(26, 0);
+    for (uint8_t i =0; i < ARR_LEN(USER_LEDS); i++) {
+      gpio_init(USER_LEDS[i]);
+      gpio_set_dir(USER_LEDS[i], GPIO_OUT);
+
+    }
 
     board_init();
     tud_init(BOARD_TUD_RHPORT);
+
+    // TODO: shouldn't need, but test first before removing
     spi_init(spi1, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
     spi_init(spi0, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
 
     bitstream_init_spi(20E6);
-    // spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
-    // volatile int offset = find_bitstream_len_offset(test_rdmem, ARR_LEN(test_rdmem));
-    // spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
-    // uint32_t bscrc = flash_calc_crc32(0x00);
-    spi_flash_read(0x00, FLASH_WRITE_BUF, 256); // whatever, just duplicate the reads...
+    enter_4byte_mode();
+    spi_write_extended_addr_reg(read_bitstream_select_pins());
+    uint8_t high_byte = spi_read_extended_addr_reg();
+    // print_err_file(get_filesystem(), "erasing chip...\r\n");
+    // spi_flash_chip_erase_blocking();
+    // print_err_file(get_filesystem(), "chip erased...\r\n");
+
+    // check first 256 bytes to see if there's a bitstream in flash
+    uint32_t bitstream_offset = flash_get_bitstream_offset();
+    print_err_file(get_filesystem(), "checking offset %lX\r\n", bitstream_offset);
+    spi_flash_read(bitstream_offset, FLASH_WRITE_BUF, 256); // whatever, just duplicate the reads...
     uint32_t bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
 
-    // test_spi_flash_prog();
     if (bs_len > 0) {
-      // spi_flash_read(0x00, FLASH_WRITE_BUF, 256); // whatever, just duplicate the reads...
+      // TODO: calc/record CRC
       fpga_program_init(20E6);
       fpga_erase();
-      // uint32_t bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
-      print_err_file(get_filesystem(), "bitstream in flash, CRC = %lX, programming %lX bytes...\r\n", 0, bs_len);
-      uint32_t flash_addr = 0x00;
+      print_err_file(get_filesystem(), "bitstream in flash @ %lX, CRC = %lX, programming %lX bytes...\r\n", bitstream_offset, 0, bs_len);
+      uint32_t flash_addr = bitstream_offset;
       while (bs_len) {
         uint32_t read_len = min(sizeof(FLASH_WRITE_BUF), bs_len);
         spi_flash_read(flash_addr, FLASH_WRITE_BUF, read_len);
@@ -144,45 +195,24 @@ int main()
         print_err_file(get_filesystem(), "Prog %lX bytes, %lX left\r\n", read_len, bs_len);
       }
     } else {
-      print_err_file(get_filesystem(), "no bitstream in flash, testing flash...\r\n");
-      int result = test_spi_flash_prog();
-      switch (result) {
-        case 0:
-          print_err_file(get_filesystem(), "Flash passed\r\n");
-          break;
-        case -1:
-          print_err_file(get_filesystem(), "Flash erase failed\r\n");
-          break;
-        default:
-          print_err_file(get_filesystem(), "Program failed at %i", result);
-          break;
-      }
+      // print_err_file(get_filesystem(), "no bitstream in flash, testing flash...\r\n");
+      // int result = test_spi_flash_prog();
+      // switch (result) {
+      //   case 0:
+      //     print_err_file(get_filesystem(), "Flash passed\r\n");
+      //     break;
+      //   case -1:
+      //     print_err_file(get_filesystem(), "Flash erase failed\r\n");
+      //     break;
+      //   default:
+      //     print_err_file(get_filesystem(), "Program failed at %i", result);
+      //     break;
+      // }
     }
-    // print_err_file(get_filesystem(), "test print %d", (int)128);
-    // bitstream_init_spi(1E6);
-    // test_spi_flash_prog();
 
-    // bitstream_init_spi(10E6);
-    // test_spi_flash_prog();
-
-    // volatile uint16_t dev_id = spi_flash_read_id();
-
-    // gpio_set_function(11, GPIO_FUNC_SPI); // TX pin
-    // gpio_set_function(10, GPIO_FUNC_SPI); // CLK pin
-    // gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
-
-    gpio_init(FPGA_CONFIG_LED); // LED0 // note should be LED3 at somepoint
+    gpio_init(FPGA_CONFIG_LED);
     gpio_set_dir(FPGA_CONFIG_LED, GPIO_OUT);
 
-    // FPGA_DONE_PIN_SETUP();
-    // FPGA_NPROG_SETUP();
-
-    // test_spi_flash_prog();
-
-
-
-    // dir_fill_req_entries(3, 0);
-    // dir_fill_req_entries(4, 0);
     set_default_config(&CONFIG);
     write_config_to_file(get_filesystem(), &CONFIG);
     if (parse_config(get_filesystem(), &CONFIG)) {
@@ -194,6 +224,10 @@ int main()
     while (true) {
         tud_task(); // tinyusb device task
         led_blinking_task();
+        for (uint8_t i = 0; i < ARR_LEN(USER_LEDS); i++) {
+          if (!gpio_get(BITSTREAM_SELECT_PINS[i])) gpio_put(USER_LEDS[i], 0);
+          else gpio_put(USER_LEDS[i], 1) ;
+        }
         if (!FPGA_ISDONE()) {
           gpio_put(FPGA_CONFIG_LED, 0);
         } else {

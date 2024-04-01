@@ -11,11 +11,11 @@ enum spi_flash_commands {
     SPI_CMD_WRITE_ENABLE = 0x06,
     SPI_CMD_WRITE_DISABLE = 0x04,
     SPI_CMD_READ_DATA = 0x03,
-    SPI_CMD_READ_DATA_4ADDR = 0x13,
+    SPI_CMD_READ_DATA_4ADDR = 0x13, // 0x13
     SPI_CMD_READ_DATA_FAST = 0x0B,
     SPI_CMD_READ_DATA_4ADDR_FAST = 0x0C,
     SPI_CMD_PAGE_PROGRAM = 0x02,
-    SPI_CMD_PAGE_4ADDR_PROGRAM = 0x12,
+    SPI_CMD_PAGE_4ADDR_PROGRAM = 0x12, // 0x12
     SPI_CMD_SECTOR_ERASE_4ADDR = 0x21,
 
     SPI_CMD_READ_STATUS1 = 0x05,
@@ -30,8 +30,13 @@ enum spi_flash_commands {
     SPI_CMD_ENTER_4BYTE_ADDR_MODE = 0xB7,
     SPI_CMD_EXIT_4BYTE_ADDR_MODE = 0xE9,
 
-    SPI_CMD_64K_BLOCK_ERASE = 0xDC,
-    SPI_CMD_32K_BLOCK_ERASE = 0x52
+    SPI_CMD_64K_BLOCK_ERASE = 0xDC, // 0xDC
+    SPI_CMD_32K_BLOCK_ERASE = 0x52,
+    SPI_CMD_CHIP_ERASE = 0xC7,
+
+    SPI_CMD_WRITE_EXT_ADDR = 0xC5,
+    SPI_CMD_READ_EXT_ADDR = 0xC8,
+
 };
 
 
@@ -69,12 +74,37 @@ enum firmware_spi_pins {
 
 int SPI_FLASH_CS_PIN = 0;
 
+void spi_write_extended_addr_reg(uint8_t addr)
+{
+    spi_flash_write_enable();
+    uint8_t cmd = SPI_CMD_WRITE_EXT_ADDR;
+
+    spi_cs_put(0);
+    spi_write_blocking(flash_spi, &cmd, 1);
+    spi_write_blocking(flash_spi, &addr, 1);
+    spi_cs_put(1);
+
+}
+
+uint8_t spi_read_extended_addr_reg(void)
+{
+    uint8_t addr = 0;
+    uint8_t cmd = SPI_CMD_READ_EXT_ADDR;
+    spi_cs_put(0);
+    spi_write_blocking(flash_spi, &cmd, 1);
+    spi_read_blocking(flash_spi, 0x00, &addr, 1);
+    spi_cs_put(1);
+    return addr;
+}
+
 void enter_4byte_mode(void)
 {
     uint8_t cmd = SPI_CMD_ENTER_4BYTE_ADDR_MODE;
-    gpio_put(SPI_FLASH_CS_PIN, 0);
+    // gpio_put(SPI_FLASH_CS_PIN, 0);
+    spi_cs_put(0);
     spi_write_blocking(flash_spi, &cmd, 1);
-    gpio_put(SPI_FLASH_CS_PIN, 1);
+    spi_cs_put(1);
+    // gpio_put(SPI_FLASH_CS_PIN, 1);
 
 }
 
@@ -109,7 +139,7 @@ void bitstream_init_spi(uint32_t baud)
     gpio_put(BS_SPI_CS, 1);
     SPI_FLASH_CS_PIN = BS_SPI_CS;
 
-    enter_4byte_mode();
+    // enter_4byte_mode();
 }
 
 /*
@@ -366,5 +396,23 @@ int spi_flash_page_program_blocking(uint32_t addr, uint8_t *data, uint16_t len)
 */
 int check_flash_for_bitstream(uint32_t offset)
 {
+    return 0;
+}
+
+/*
+Erases memory of whole chip
+
+Takes a while (like 2 minutes)
+*/
+int spi_flash_chip_erase_blocking(void)
+{
+    if (spi_flash_write_enable()) return -1; // ensure write is enabled
+
+    uint8_t cmd = SPI_CMD_CHIP_ERASE;
+    spi_cs_put(0);
+    spi_write_blocking(flash_spi, &cmd, 1);
+    spi_cs_put(1);
+
+    while (spi_flash_is_busy());
     return 0;
 }

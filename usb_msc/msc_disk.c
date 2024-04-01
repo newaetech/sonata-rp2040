@@ -26,6 +26,7 @@ struct config_options CONFIG = {.dirty = 1,
                                 .prog_flash = CONF_DEFAULT_FLASH_PROG_SPEED};
 
 extern uint32_t blink_interval_ms;
+uint32_t flash_get_bitstream_offset(void);
 
 // Invoked to determine max LUN
 uint8_t tud_msc_get_maxlun_cb(void)
@@ -136,6 +137,8 @@ uint32_t FLASH_BUF_CURRENT_OFFSET = 0;
 uint32_t FLASH_TOTAL_PROG_BYTES = 0;
 uint32_t FLASH_PROG_BYTES_LEFT = 0;
 
+uint32_t FLASH_BASE_OFFSET = 0;
+
 // Callback invoked when received WRITE10 command.
 // Process data in buffer to disk's storage and return number of written bytes
 
@@ -165,16 +168,9 @@ uint32_t flash_calc_crc32(uint32_t addr)
     }
 
     print_err_file(get_filesystem(), "Read %lX bytes from flash\r\n", i);
-    // for (uint32_t i = 0; i < bs_len; i += 256) {
-    //     uint32_t read_len = ((i + 256) > bs_len) ? (bs_len - i) : 256;
-
-    //     spi_flash_read(addr + i, TEST_RD_BUF, read_len);
-    //     crc = crc32c(crc, TEST_RD_BUF, read_len);
-    // }
     return crc;
 }
 
-// idea - uint8_t + bufsize & 0xFF will always be aligned with flash page
 int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
 {
     // out of ramdisk
@@ -246,6 +242,9 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                     // update offsets with new data
                     FLASH_BUF_CURRENT_OFFSET += bufsize;
 
+                    FLASH_BASE_OFFSET = flash_get_bitstream_offset();
+                    print_err_file(get_filesystem(), "Using offset %lX\r\n", FLASH_BASE_OFFSET);
+
                     BITSTREAM_CRC32 = 0x00;
                     FLASH_TOTAL_PROG_BYTES = 0;
                 }
@@ -262,7 +261,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                 // todo just keep track of flash length separate from fpga length
                 if (BLOCK_COUNTER >= 0x10000) {
                     while (spi_flash_is_busy());
-                    if (spi_flash_64k_erase_nonblocking(FLASH_CURRENT_OFFSET)) { // todo add different index options to flash
+                    if (spi_flash_64k_erase_nonblocking(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET)) { // todo add different index options to flash
                         print_err_file(get_filesystem(), "Erase error @ %lX\r\n", FLASH_CURRENT_OFFSET);
                     }
                     BLOCK_COUNTER = 0;
@@ -292,14 +291,14 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                         uint16_t write_len = min(256, FLASH_BUF_CURRENT_OFFSET - i); // can write up to 256 bytes at a time
 
                         // program in the current offset in flash
-                        if (spi_flash_page_program_blocking(FLASH_CURRENT_OFFSET, FLASH_WRITE_BUF + i, write_len)) {// do the write
+                        if (spi_flash_page_program_blocking(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET, FLASH_WRITE_BUF + i, write_len)) {// do the write
                             print_err_file(get_filesystem(), "Prog error @ %lX\r\n", FLASH_CURRENT_OFFSET);
                             
                         }
                         // BITSTREAM_CRC32 = crc32c(BITSTREAM_CRC32, FLASH_WRITE_BUF + i, write_len);
 
                         // and verify what we wrote
-                        spi_flash_read(FLASH_CURRENT_OFFSET, TEST_RD_BUF, write_len);
+                        spi_flash_read(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET, TEST_RD_BUF, write_len);
                         if (memcmp(FLASH_WRITE_BUF + i, TEST_RD_BUF, write_len)) {
                             print_err_file(get_filesystem(), "Verify error @ %lX\r\n", FLASH_CURRENT_OFFSET);
                         }
@@ -323,7 +322,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
             if (!FPGA_PROG_BYTES_LEFT) {
                 print_err_file(get_filesystem(), "Finished programming %lX bytes, verifying CRC\r\n", FPGA_TOTAL_PROG_BYTES);
-                uint32_t read_crc = flash_calc_crc32(0x00);
+                uint32_t read_crc = flash_calc_crc32(FLASH_BASE_OFFSET);
                 if (read_crc != BITSTREAM_CRC32) {
                     print_err_file(get_filesystem(), "CRC mismatch %lX on flash, %lX prog'd\r\n", read_crc, BITSTREAM_CRC32);
                 } else {
