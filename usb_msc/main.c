@@ -29,6 +29,12 @@
 uint8_t USER_LEDS[] = {26, 25, 24};
 uint8_t BITSTREAM_SELECT_PINS[] = {29, 28, 27};
 
+#ifdef DEBUG_LEVEL
+  #define XSTR(X) STR(X)
+  #define STR(X) #X
+  #pragma message "TEST_DEBUG_LEVEL = " XSTR(DEBUG_LEVEL)
+#endif
+
 // TODO
 // #define ERR_LED 26
 
@@ -55,18 +61,18 @@ extern struct config_options CONFIG;
 uint8_t test_rdmem[256];
 uint8_t test_mem[256];
 
-uint32_t xorshift_state = 0xF2BB9566;
+// uint32_t xorshift_state = 0xF2BB9566;
 
-/*
-Basic RNG func
-*/
-uint32_t xorshift(void)
-{
-  xorshift_state ^= xorshift_state << 13;
-  xorshift_state ^= xorshift_state >> 17;
-  xorshift_state ^= xorshift_state << 5;
-  return xorshift_state;
-}
+// /*
+// Basic RNG func
+// */
+// uint32_t xorshift(void)
+// {
+//   xorshift_state ^= xorshift_state << 13;
+//   xorshift_state ^= xorshift_state >> 17;
+//   xorshift_state ^= xorshift_state << 5;
+//   return xorshift_state;
+// }
 
 /*
 Fill buff randomly
@@ -74,7 +80,7 @@ Fill buff randomly
 void fill_buf(uint8_t *buf, uint16_t len)
 {
     for (uint16_t i = 0; i < (len - 3); i += 4) {
-        uint32_t current = xorshift();
+        uint32_t current = 0;// xorshift();
         memcpy(buf + i, &current, 4);
     }
 }
@@ -86,7 +92,6 @@ int test_spi_flash_prog(void)
 {
     for (uint32_t i = 0; i < ARR_LEN(test_mem); i++) test_mem[i] = i;
     spi_flash_sector_erase_blocking(0x00);
-    volatile enum spi_flash_status1 status = spi_flash_read_status();
     spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
     for (uint16_t i = 0; i < ARR_LEN(test_rdmem); i++) {
       if ((test_rdmem[i] != 0xFF)) { // erased mem is 0xFF
@@ -153,6 +158,7 @@ int main()
     gpio_set_dir(LED_PIN, GPIO_OUT);
     setup_bitstream_select_pin();
 
+    // Setup LEDs
     for (uint8_t i =0; i < ARR_LEN(USER_LEDS); i++) {
       gpio_init(USER_LEDS[i]);
       gpio_set_dir(USER_LEDS[i], GPIO_OUT);
@@ -162,21 +168,11 @@ int main()
     board_init();
     tud_init(BOARD_TUD_RHPORT);
 
-    // TODO: shouldn't need, but test first before removing
-    spi_init(spi1, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
-    spi_init(spi0, 10E6); //Min speed seems to be ~100kHz, below that USB gets angry
-
     bitstream_init_spi(20E6);
-    enter_4byte_mode();
-    spi_write_extended_addr_reg(read_bitstream_select_pins());
-    uint8_t high_byte = spi_read_extended_addr_reg();
-    // print_err_file(get_filesystem(), "erasing chip...\r\n");
-    // spi_flash_chip_erase_blocking();
-    // print_err_file(get_filesystem(), "chip erased...\r\n");
 
     // check first 256 bytes to see if there's a bitstream in flash
     uint32_t bitstream_offset = flash_get_bitstream_offset();
-    print_err_file(get_filesystem(), "checking offset %lX\r\n", bitstream_offset);
+    PRINT_INFO("Checking bitstream offset %lX", bitstream_offset);
     spi_flash_read(bitstream_offset, FLASH_WRITE_BUF, 256); // whatever, just duplicate the reads...
     uint32_t bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
 
@@ -184,7 +180,7 @@ int main()
       // TODO: calc/record CRC
       fpga_program_init(20E6);
       fpga_erase();
-      print_err_file(get_filesystem(), "bitstream in flash @ %lX, CRC = %lX, programming %lX bytes...\r\n", bitstream_offset, 0, bs_len);
+      PRINT_INFO("Bitstream in flash @ %lX, programming %lX bytes...", bitstream_offset, bs_len);
       uint32_t flash_addr = bitstream_offset;
       while (bs_len) {
         uint32_t read_len = min(sizeof(FLASH_WRITE_BUF), bs_len);
@@ -192,22 +188,10 @@ int main()
         fpga_program_sendchunk(FLASH_WRITE_BUF, read_len);
         bs_len -= read_len;
         flash_addr += read_len;
-        print_err_file(get_filesystem(), "Prog %lX bytes, %lX left\r\n", read_len, bs_len);
+        PRINT_DEBUG("Prog %lX bytes, %lX left", read_len, bs_len);
       }
     } else {
-      // print_err_file(get_filesystem(), "no bitstream in flash, testing flash...\r\n");
-      // int result = test_spi_flash_prog();
-      // switch (result) {
-      //   case 0:
-      //     print_err_file(get_filesystem(), "Flash passed\r\n");
-      //     break;
-      //   case -1:
-      //     print_err_file(get_filesystem(), "Flash erase failed\r\n");
-      //     break;
-      //   default:
-      //     print_err_file(get_filesystem(), "Program failed at %i", result);
-      //     break;
-      // }
+      PRINT_INFO("No bitstream in flash @ %lX", bitstream_offset);
     }
 
     gpio_init(FPGA_CONFIG_LED);
@@ -217,8 +201,13 @@ int main()
     write_config_to_file(get_filesystem(), &CONFIG);
     if (parse_config(get_filesystem(), &CONFIG)) {
         // if config parse fails, set everything back to default
+        PRINT_WARN("Default config parse failed");
         set_default_config(&CONFIG);
     }
+
+    #ifdef TESTING_BUILD
+    test_crc(0);
+    #endif
 
 
     while (true) {

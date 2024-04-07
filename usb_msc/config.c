@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "config.h"
 #include "util.h"
+#include "error.h"
 
 #define FPGA_PROG_SPEED_STR "SPI_FPGA_SPEED"
 #define FLASH_PROG_SPEED_STR "SPI_FLASH_SPEED"
@@ -111,6 +112,7 @@ int parse_config(struct fat_filesystem *fs, struct config_options *opts)
                 else if (!memcmp(cur_line, "NO", sizeof("NO") - 1)) opts->prog_flash = false;
                 break;
             default:
+                PRINT_ERR("Config parse failed at %s", cur_line);
                 return -1;
 
         }

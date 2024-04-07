@@ -1,0 +1,16 @@
+target extended-remote localhost:3333
+load
+monitor reset init
+
+define reload_restart
+    load
+    monitor reset init
+    continue
+end
+
+define print_dir_entry
+    print $arg0.filename
+    print $arg0.extension
+    print $arg0.starting_cluster
+    print $arg0.file_size
+end
