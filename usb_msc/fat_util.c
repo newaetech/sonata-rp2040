@@ -92,6 +92,13 @@ int cstr_to_fatstr(char *cstr, uint8_t *fatstr)
     return 0;
 }
 
+int fat_strlen(uint8_t *fatstr)
+{
+    int cnt = 0;
+    while (fatstr[cnt] != ' ') cnt++;
+    return cnt;
+}
+
 /*
     Get a pointer to the filesystem in RAM
 */

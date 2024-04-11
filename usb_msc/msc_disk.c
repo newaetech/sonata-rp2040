@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include "error.h"
 #include "crc32.h"
+#include "tests.h"
 
 
 uint8_t FLASH_WRITE_BUF[CONST_64k];
@@ -200,12 +201,12 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
     if (!is_reserved_cluster) {
         // if config is marked as dirty, reread it
-        if (CONFIG.dirty) {
-            if (parse_config(get_filesystem(), &CONFIG)) {
-                // if config parse fails, set everything back to default
-                set_default_config(&CONFIG);
-            }
-        }
+        // if (CONFIG.dirty) {
+        //     if (parse_config(get_filesystem(), &CONFIG)) {
+        //         // if config parse fails, set everything back to default
+        //         set_default_config(&CONFIG);
+        //     }
+        // }
 
         if (!FPGA_PROG_BYTES_LEFT) {
             FPGA_PROG_BYTES_LEFT = get_bitstream_length(buffer, bufsize);
@@ -323,11 +324,23 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
             if (!FPGA_PROG_BYTES_LEFT) {
                 PRINT_INFO("Finished programming %lX bytes, verifying CRC", FPGA_TOTAL_PROG_BYTES);
                 uint32_t read_crc = flash_calc_crc32(FLASH_BASE_OFFSET);
-                if (read_crc != BITSTREAM_CRC32) {
-                    PRINT_ERR("CRC mismatch %lX on flash, %lX prog'd", read_crc, BITSTREAM_CRC32);
-                } else {
-                    PRINT_INFO("CRC matched (%lX)", read_crc);
+                if (CONFIG.prog_flash) {
+                    if (read_crc != BITSTREAM_CRC32) {
+                        PRINT_ERR("CRC mismatch %lX on flash, %lX prog'd", read_crc, BITSTREAM_CRC32);
+                    } else {
+                        PRINT_INFO("CRC matched (%lX)", read_crc);
+                    }
+                    #ifdef TESTING_BUILD
+                    PRINT_TEST(read_crc == BITSTREAM_CRC32, "flash CRC check");
+                    #endif
+
                 }
+                if (!FPGA_ISDONE()) {
+                    PRINT_ERR("FPGA Done pin failed to go high. Is your bitstream valid?");
+                }
+                #ifdef TESTING_BUILD
+                test_done_program(0);
+                #endif
             }
         }
     }
@@ -338,6 +351,24 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     uint8_t *addr = fs->raw_sectors[lba] + offset;
     memcpy(addr, buffer, bufsize);
     write_file_info(fs, 0, "ERROR", &err_file_entry); // make sure PC doesn't overwrite our err file info
+
+    /* Hack to update config immediately */
+    if (CONFIG.dirty) {
+        if (parse_config(get_filesystem(), &CONFIG)) {
+            // if config parse fails, set everything back to default
+            set_default_config(&CONFIG);
+            #ifdef TESTING_BUILD
+            PRINT_TEST(0, "config parse");
+            #endif
+        } else {
+            #ifdef TESTING_BUILD
+            PRINT_TEST(1, "config parse");
+            test_config(0);
+            #endif
+
+        }
+
+    }
     return bufsize;
 }
 

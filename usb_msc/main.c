@@ -58,56 +58,6 @@ void set_err_led(int on)
   // TODO
 }
 extern struct config_options CONFIG;
-uint8_t test_rdmem[256];
-uint8_t test_mem[256];
-
-// uint32_t xorshift_state = 0xF2BB9566;
-
-// /*
-// Basic RNG func
-// */
-// uint32_t xorshift(void)
-// {
-//   xorshift_state ^= xorshift_state << 13;
-//   xorshift_state ^= xorshift_state >> 17;
-//   xorshift_state ^= xorshift_state << 5;
-//   return xorshift_state;
-// }
-
-/*
-Fill buff randomly
-*/
-void fill_buf(uint8_t *buf, uint16_t len)
-{
-    for (uint16_t i = 0; i < (len - 3); i += 4) {
-        uint32_t current = 0;// xorshift();
-        memcpy(buf + i, &current, 4);
-    }
-}
-
-/*
-Test function to erase, program, and read back "random" mem from spi flash
-*/
-int test_spi_flash_prog(void)
-{
-    for (uint32_t i = 0; i < ARR_LEN(test_mem); i++) test_mem[i] = i;
-    spi_flash_sector_erase_blocking(0x00);
-    spi_flash_read(0x00, test_rdmem, ARR_LEN(test_rdmem));
-    for (uint16_t i = 0; i < ARR_LEN(test_rdmem); i++) {
-      if ((test_rdmem[i] != 0xFF)) { // erased mem is 0xFF
-        return -1;
-      }
-    }
-
-    for (uint16_t i = 0; i < CONST_4k; i += 256) {
-        fill_buf(test_mem, 256);
-        spi_flash_page_program_blocking(i, test_mem, ARR_LEN(test_mem));
-        spi_flash_read(i, test_rdmem, ARR_LEN(test_rdmem));
-        if (memcmp(test_mem, test_rdmem, sizeof(test_rdmem))) return -i;
-    }
-    return 0;
-
-}
 
 uint32_t flash_calc_crc32(uint32_t addr);
 
@@ -169,6 +119,11 @@ int main()
     tud_init(BOARD_TUD_RHPORT);
 
     bitstream_init_spi(20E6);
+    #ifdef TESTING_BUILD
+    test_crc(0);
+    // this stops USB from working for some reason...
+    // test_basic_flash(0);
+    #endif
 
     // check first 256 bytes to see if there's a bitstream in flash
     uint32_t bitstream_offset = flash_get_bitstream_offset();
@@ -203,11 +158,9 @@ int main()
         // if config parse fails, set everything back to default
         PRINT_WARN("Default config parse failed");
         set_default_config(&CONFIG);
+        int i = fat_strlen(get_filesystem()->root_dir[0].filename);
     }
 
-    #ifdef TESTING_BUILD
-    test_crc(0);
-    #endif
 
 
     while (true) {

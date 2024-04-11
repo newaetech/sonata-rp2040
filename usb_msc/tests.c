@@ -5,20 +5,59 @@
 #include "crc32.h"
 #include "config.h"
 #include "fpga_program.h"
+#include "flash_util.h"
+extern struct config_options CONFIG;
+static uint8_t test_rdmem[256];
+static uint8_t test_mem[256];
+// int test_program_bitstream(int interation)
+// {
+//     // PRINT_TEST(FPGA_ISDONE(), "FPGA Done Pin");
+//     return 0;
+// }
+void xor_fill_buf(uint32_t *buf, int len, uint32_t seed);
 
-int test_program_bitstream(int interation)
+int test_done_program(int iteration)
 {
     PRINT_TEST(FPGA_ISDONE(), "FPGA Done Pin");
     return 0;
 }
 
-int test_program_flash(int iteration)
+int test_basic_flash(int iteration)
 {
+    int passed = 1;
+    for (uint32_t i = 0; i < ARR_LEN(test_mem); i++) test_mem[i] = i;
+    spi_flash_sector_erase_blocking(0x00);
+    spi_flash_read(0x00, test_rdmem, sizeof(test_rdmem));
+    for (uint16_t i = 0; i < ARR_LEN(test_rdmem); i++) {
+        if ((test_rdmem[i] != 0xFF)) { // erased mem is 0xFF
+            passed = 0;
+        }
+    }
+    PRINT_TEST(passed, "Erase flash");
+
+    passed = 1;
+    xor_fill_buf(test_mem, 256, 0x11223344);
+    spi_flash_page_program_blocking(0, test_mem, sizeof(test_mem));
+    spi_flash_read(0, test_rdmem, sizeof(test_rdmem));
+    if (memcmp(test_mem, test_rdmem, sizeof(test_rdmem))) passed = 0;
+    PRINT_TEST(passed, "Program flash");
     return 0;
 }
 
+// int test_erase_flash_bitstream(int section)
+// {
+//     int i = 0;
+// }
+
 int test_config(int iteration)
 {
+    struct config_options comp = {
+        .fpga_prog_speed = 7.77E6,
+        .flash_prog_speed = 5.12E6,
+        .prog_flash = false,
+        .dirty = false
+    };
+    PRINT_TEST(!memcmp(&comp, &CONFIG, sizeof(comp)), "Match config");
     return 0;
 }
 
