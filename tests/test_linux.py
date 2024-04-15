@@ -7,6 +7,16 @@ logging.basicConfig(filename="log.txt", level=logging.DEBUG, filemode='w',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',)
 
+def get_sonata_path():
+    import subprocess
+    result = subprocess.run(['blkid', '-l', '-o', 'device', '-t', 
+                             'LABEL=SONATA', '-c', '/dev/null'],
+                             capture_output=True)
+    mnt = result.stdout().decode().strip()
+    result = subprocess.run(['findmnt', mnt, '-no', 'TARGET'], capture_output=True)
+    return result.stdout().decode().strip()
+
+
 sonata_path = "../../sonata" #TODO: make this better
 print("Copying sonata.bit...")
 copy_sonata_bitstream(sonata_path)
