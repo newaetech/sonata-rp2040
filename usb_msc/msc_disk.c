@@ -349,8 +349,16 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
         return bufsize; // fake it
     struct fat_filesystem *fs = get_filesystem();
     uint8_t *addr = fs->raw_sectors[lba] + offset;
+
+    // Windows tries to mess up the file table...
+    // uint16_t bad_seq[] = {0xFFF0, 0xFFF};
+    // if (!memcmp(buffer + 10, bad_seq, sizeof(bad_seq))) {
+    //     PRINT_DEBUG("Sys info invalid FAT, fixing...");
+    //     memset(buffer + 10, 0xFF, sizeof(bad_seq));
+    // }
     memcpy(addr, buffer, bufsize);
     write_file_info(fs, 0, "ERROR", &err_file_entry); // make sure PC doesn't overwrite our err file info
+
 
     /* Hack to update config immediately */
     if (CONFIG.dirty) {
@@ -358,11 +366,11 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
             // if config parse fails, set everything back to default
             set_default_config(&CONFIG);
             #ifdef TESTING_BUILD
-            PRINT_TEST(0, "config parse");
+            PRINT_TEST(0, "config parse iteration %d");
             #endif
         } else {
             #ifdef TESTING_BUILD
-            PRINT_TEST(1, "config parse");
+            PRINT_TEST(1, "config parse iteration %d");
             test_config(0);
             #endif
 

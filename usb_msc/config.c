@@ -141,9 +141,11 @@ int parse_config(struct fat_filesystem *fs, struct config_options *opts)
                 break;
             case CONF_PROG_FLASH:
                 while (*cur_line == ' ') cur_line++; // skip spaces
-                if (!memcmp(cur_line, "YES", sizeof("YES") - 1))    opts->prog_flash = true;
-                else if (!memcmp(cur_line, "NO", sizeof("NO") - 1)) opts->prog_flash = false;
-                else {
+                if (!memcmp(cur_line, "YES", sizeof("YES") - 1)) {
+                    opts->prog_flash = true;
+                } else if (!memcmp(cur_line, "NO", sizeof("NO") - 1)) {
+                    opts->prog_flash = false;
+                } else {
                     PRINT_ERR("Invalid option for PROG_FLASH at %s", cur_line);
                     return -1;
                 }

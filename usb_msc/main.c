@@ -101,12 +101,19 @@ uint32_t flash_get_bitstream_offset(void)
     return FLASH_BITSTREAM_OFFSET[pin];
 }
 
+uint16_t initial_fat[] = {0xFFF8, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+
 int main() 
 {
     const uint LED_PIN = 24; // LED1
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     setup_bitstream_select_pin();
+
+    // zero and reinit fat upon boot
+    // memset(get_filesystem()->fat, 0, DISK_SECTOR_PER_FAT*DISK_SECTOR_SIZE);
+    // memcpy(get_filesystem()->fat, initial_fat, sizeof(initial_fat));
+    memset(get_filesystem()->clusters[3], ' ', DISK_CLUSTER_SIZE); // IDK why this cluster has to be all spaces on Windows...
 
     // Setup LEDs
     for (uint8_t i =0; i < ARR_LEN(USER_LEDS); i++) {
