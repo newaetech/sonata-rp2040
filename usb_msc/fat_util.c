@@ -1,6 +1,7 @@
 #include "fat_util.h"
 #include <stdint.h>
 #include "util.h"
+#include "error.h"
 int is_valid_file(struct directory_entry *entry);
 
 static struct fat_filesystem FILESYSTEM = {
@@ -29,7 +30,12 @@ static struct fat_filesystem FILESYSTEM = {
                 0xFF, 0xFF, // End of chain indicator (reserved cluster?)
                 0xFF, 0xFF, // cluster 2 (README.txt in our case)
                 0xFF, 0xFF, // cluster 3 (OPTIONS.txt in our case)
+                // NOTE: doing the ERROR.txt alloc manually, could do it with a func in the future
                 0xFF, 0xFF, // cluster 4 (ERROR.txt in our case)
+                // 0x05, 0x00, // cluster 4 (ERROR.txt in our case)
+                // 0x06, 0x00, // cluster 4 (error.txt in our case)
+                // 0x07, 0x00, // cluster 4 (ERROR.txt in our case)
+                // 0xFF, 0xFF, // cluster 4 (ERROR.txt in our case)
             }},
     .root_dir = {{
                     .filename = {'S', 'O', 'N', 'A', 'T', 'A', ' ', ' '}, // name
@@ -58,7 +64,7 @@ static struct fat_filesystem FILESYSTEM = {
                     .creation_date = {0x65, 0x43}, .last_access_date = {0x65, 0x43}, 
                     .time_stamp = {0x88, 0x6D}, .date_stamp = {0x65, 0x43}, 
                     .attribute = FAT_DIR_READ_ONLY,
-                    .starting_cluster = {0x04, 0x00}, .file_size = {LE_U32_TO_4U8(DISK_CLUSTER_SIZE)}
+                    .starting_cluster = {0x04, 0x00}, .file_size = {LE_U32_TO_4U8(DISK_CLUSTER_SIZE * ERR_FILE_NUM_CLUSTER)}
                 }
                 },
     .clusters = {{README_CONTENTS}, {OPTIONS_CONTENTS}, {}}
@@ -84,6 +90,13 @@ int cstr_to_fatstr(char *cstr, uint8_t *fatstr)
         }
     }
     return 0;
+}
+
+int fat_strlen(uint8_t *fatstr)
+{
+    int cnt = 0;
+    while (fatstr[cnt] != ' ') cnt++;
+    return cnt;
 }
 
 /*
@@ -372,3 +385,20 @@ void dir_fill_req_entries(uint16_t cluster_num, uint16_t parent_cluster)
         .date_stamp = {0x65, 0x43},
         .starting_cluster = LE_U16_TO_2U8(parent_cluster)};
 }
+
+// /*
+// Makes an allocation on the FAT based on the starting cluster and file length
+// */
+// int alloc_fat(struct fat_filesystem *fs, struct directory_entry *file)
+// {
+//     uint16_t *current_cluster;
+//     uint32_t size_left = LE_4U8_TO_U32(file->file_size)
+
+//     current_cluster = LE_2U8_TO_U16(file->starting_cluster);
+//     uint32_t next_free_cluster_idx = 0;
+
+//     while (size_left > DISK_CLUSTER_SIZE) {
+//         while (fs->fat16[next_free_cluster_idx + 2]) next_free_cluster_idx++;
+//         if (next_free_cluster_idx > DISK_REAL_CLUSTER_NUM) return -1; // couldn't allocate, not enough real space
+//     }
+// }

@@ -5,3 +5,5 @@ cmake-*
 .DS_Store
 *.pdf
 build/**
+*.txt
+**/__pycache__/**

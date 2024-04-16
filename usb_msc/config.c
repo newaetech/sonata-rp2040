@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "config.h"
 #include "util.h"
+#include "error.h"
 
 #define FPGA_PROG_SPEED_STR "SPI_FPGA_SPEED"
 #define FLASH_PROG_SPEED_STR "SPI_FLASH_SPEED"
@@ -68,6 +69,31 @@ int write_config_to_file(struct fat_filesystem *fs, struct config_options *opts)
     return 0;
 }
 
+// check if *x until a newline is a valid integer
+int str_is_valid_integer(const char *x)
+{
+    int is_valid = 1;
+
+    while (*x == ' ') x++; // skip whitespaces
+    if (*x == '0') { // hex/octal prefix
+        x++;
+        // if 1-9, then it's an octal number
+        if (*x <= '1' || *x >= '9') {
+            // if it's x or X, then it's a hex number
+            if (*x != 'x' && *x != 'X') {
+                return 0;
+            }
+        } else {
+            return 0;
+        }
+    }
+    while (*x >= '0' && *x <= '9') x++; //skip all the numbers
+    while (*x == ' ') x++; //skip spaces
+    //next thing has to be \r\n or \n
+    if (*x == '\r') x++; // skip past \r
+    return (*x == '\n'); // should end on \n
+}
+
 /*
     Parses config file in root directory of fs
 
@@ -100,17 +126,32 @@ int parse_config(struct fat_filesystem *fs, struct config_options *opts)
         cur_line++; //advance beyond '='
         switch (cur_opt) {
             case CONF_FPGA_PROG_SPEED:
+                if (!str_is_valid_integer(cur_line)) {
+                    PRINT_ERR("Invalid integer at %s", cur_line);
+                    return -1;
+                }
                 opts->fpga_prog_speed = strtoul(cur_line, NULL, 0);
                 break;
             case CONF_FLASH_PROG_SPEED:
+                if (!str_is_valid_integer(cur_line)) {
+                    PRINT_ERR("Invalid integer at %s", cur_line);
+                    return -1;
+                }
                 opts->flash_prog_speed = strtoul(cur_line, NULL, 0);
                 break;
             case CONF_PROG_FLASH:
                 while (*cur_line == ' ') cur_line++; // skip spaces
-                if (!memcmp(cur_line, "YES", sizeof("YES") - 1))    opts->prog_flash = true;
-                else if (!memcmp(cur_line, "NO", sizeof("NO") - 1)) opts->prog_flash = false;
+                if (!memcmp(cur_line, "YES", sizeof("YES") - 1)) {
+                    opts->prog_flash = true;
+                } else if (!memcmp(cur_line, "NO", sizeof("NO") - 1)) {
+                    opts->prog_flash = false;
+                } else {
+                    PRINT_ERR("Invalid option for PROG_FLASH at %s", cur_line);
+                    return -1;
+                }
                 break;
             default:
+                PRINT_ERR("Config parse failed at %s", cur_line);
                 return -1;
 
         }
@@ -123,7 +164,7 @@ int parse_config(struct fat_filesystem *fs, struct config_options *opts)
 
 void set_default_config(struct config_options *opts)
 {
-    opts->dirty = 1;
+    opts->dirty = 0;
     opts->flash_prog_speed = CONF_DEFAULT_FLASH_PROG_SPEED;
     opts->fpga_prog_speed = CONF_DEFAULT_FPGA_PROG_SPEED;
     opts->prog_flash = CONF_DEFAULT_PROG_FLASH;

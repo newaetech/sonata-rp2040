@@ -1,0 +1,20 @@
+target extended-remote localhost:3333
+load
+monitor reset init
+
+define reload_restart
+    load
+    monitor reset init
+    continue
+end
+
+
+define test_print
+    print_dir_entry FILESYSTEM.root_dir[0]
+end
+
+define print_errtxt
+    set print element 0
+    print FILESYSTEM.clusters[2]
+    set print element 200
+end

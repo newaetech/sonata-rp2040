@@ -179,3 +179,5 @@ uint32_t get_file_length(struct fat_filesystem *fs, uint16_t parent_cluster, cha
 int32_t get_file_info(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename, struct directory_entry *file_info);
 
 int32_t write_file_info(struct fat_filesystem *fs, uint16_t parent_cluster, char *filename, struct directory_entry *file_info);
+
+int fat_strlen(uint8_t *fatstr);

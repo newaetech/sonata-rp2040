@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include "error.h"
 #include "crc32.h"
+#include "tests.h"
 
 
 uint8_t FLASH_WRITE_BUF[CONST_64k];
@@ -156,7 +157,7 @@ uint32_t flash_calc_crc32(uint32_t addr)
     uint32_t bs_len = get_bitstream_length(TEST_RD_BUF, 256);
     if (!bs_len) return 0;
 
-    print_err_file(get_filesystem(), "Reading %lX bytes from flash\r\n", bs_len);
+    PRINT_INFO("Reading %lX bytes from flash", bs_len);
 
     uint32_t crc = crc32c(0x00, TEST_RD_BUF, 256);
     uint32_t i = 256;
@@ -167,7 +168,7 @@ uint32_t flash_calc_crc32(uint32_t addr)
         i += read_len;
     }
 
-    print_err_file(get_filesystem(), "Read %lX bytes from flash\r\n", i);
+    PRINT_INFO("Read %lX bytes from flash", i);
     return crc;
 }
 
@@ -200,12 +201,12 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
     if (!is_reserved_cluster) {
         // if config is marked as dirty, reread it
-        if (CONFIG.dirty) {
-            if (parse_config(get_filesystem(), &CONFIG)) {
-                // if config parse fails, set everything back to default
-                set_default_config(&CONFIG);
-            }
-        }
+        // if (CONFIG.dirty) {
+        //     if (parse_config(get_filesystem(), &CONFIG)) {
+        //         // if config parse fails, set everything back to default
+        //         set_default_config(&CONFIG);
+        //     }
+        // }
 
         if (!FPGA_PROG_BYTES_LEFT) {
             FPGA_PROG_BYTES_LEFT = get_bitstream_length(buffer, bufsize);
@@ -216,7 +217,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                 for (volatile uint32_t i = 0; i < 5000; i++);
                 fpga_program_setup2(); // nprog back high
                 for (volatile uint32_t i = 0; i < 5000; i++); // need to wait a bit after this before we start programming, 5ms from datasheet info
-                print_err_file(get_filesystem(), "Programming %lX bytes\r\n", FPGA_PROG_BYTES_LEFT);
+                PRINT_INFO("Programming %lX bytes", FPGA_PROG_BYTES_LEFT);
 
                 bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
                 FPGA_TOTAL_PROG_BYTES = FPGA_PROG_BYTES_LEFT;
@@ -243,7 +244,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                     FLASH_BUF_CURRENT_OFFSET += bufsize;
 
                     FLASH_BASE_OFFSET = flash_get_bitstream_offset();
-                    print_err_file(get_filesystem(), "Using offset %lX\r\n", FLASH_BASE_OFFSET);
+                    PRINT_INFO("Using offset %lX", FLASH_BASE_OFFSET);
 
                     BITSTREAM_CRC32 = 0x00;
                     FLASH_TOTAL_PROG_BYTES = 0;
@@ -262,7 +263,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                 if (BLOCK_COUNTER >= 0x10000) {
                     while (spi_flash_is_busy());
                     if (spi_flash_64k_erase_nonblocking(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET)) { // todo add different index options to flash
-                        print_err_file(get_filesystem(), "Erase error @ %lX\r\n", FLASH_CURRENT_OFFSET);
+                        PRINT_ERR("Erase error @ %lX", FLASH_CURRENT_OFFSET);
                     }
                     BLOCK_COUNTER = 0;
                 }
@@ -284,7 +285,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                     while (spi_flash_is_busy());
                     if (FLASH_BUF_CURRENT_OFFSET >= FLASH_PROG_BYTES_LEFT) {
                         FLASH_BUF_CURRENT_OFFSET = FLASH_PROG_BYTES_LEFT;
-                        print_err_file(get_filesystem(), "Prog %lX bytes\r\n", FLASH_BUF_CURRENT_OFFSET);
+                        PRINT_DEBUG("Prog %lX bytes", FLASH_BUF_CURRENT_OFFSET);
                     }
                     uint32_t i = 0;
                     while (i < FLASH_BUF_CURRENT_OFFSET) {
@@ -292,7 +293,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
                         // program in the current offset in flash
                         if (spi_flash_page_program_blocking(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET, FLASH_WRITE_BUF + i, write_len)) {// do the write
-                            print_err_file(get_filesystem(), "Prog error @ %lX\r\n", FLASH_CURRENT_OFFSET);
+                            PRINT_ERR("Prog error @ %lX", FLASH_CURRENT_OFFSET);
                             
                         }
                         // BITSTREAM_CRC32 = crc32c(BITSTREAM_CRC32, FLASH_WRITE_BUF + i, write_len);
@@ -300,7 +301,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                         // and verify what we wrote
                         spi_flash_read(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET, TEST_RD_BUF, write_len);
                         if (memcmp(FLASH_WRITE_BUF + i, TEST_RD_BUF, write_len)) {
-                            print_err_file(get_filesystem(), "Verify error @ %lX\r\n", FLASH_CURRENT_OFFSET);
+                            PRINT_ERR("Verify error @ %lX", FLASH_CURRENT_OFFSET);
                         }
                         i += write_len;
                         BLOCK_COUNTER += write_len;
@@ -313,7 +314,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                     // FLASH_CURRENT_OFFSET += FLASH_BUF_CURRENT_OFFSET;
                     // BLOCK_COUNTER += FLASH_BUF_CURRENT_OFFSET;
                     BITSTREAM_CRC32 = crc32c(BITSTREAM_CRC32, FLASH_WRITE_BUF, FLASH_BUF_CURRENT_OFFSET);
-                    print_err_file(get_filesystem(), "Prog %lX bytes, CRC = %lX, %lX bytes left, bufsize %lX, total prog = %lX\r\n", FLASH_BUF_CURRENT_OFFSET, BITSTREAM_CRC32, FLASH_PROG_BYTES_LEFT, bufsize, FLASH_TOTAL_PROG_BYTES);
+                    PRINT_DEBUG("Prog %lX bytes, CRC = %lX, %lX bytes left, bufsize %lX, total prog = %lX", FLASH_BUF_CURRENT_OFFSET, BITSTREAM_CRC32, FLASH_PROG_BYTES_LEFT, bufsize, FLASH_TOTAL_PROG_BYTES);
                     FLASH_BUF_CURRENT_OFFSET = 0;
                 } 
             }
@@ -321,13 +322,25 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
             FPGA_PROG_BYTES_LEFT -= bufsize;
 
             if (!FPGA_PROG_BYTES_LEFT) {
-                print_err_file(get_filesystem(), "Finished programming %lX bytes, verifying CRC\r\n", FPGA_TOTAL_PROG_BYTES);
+                PRINT_INFO("Finished programming %lX bytes, verifying CRC", FPGA_TOTAL_PROG_BYTES);
                 uint32_t read_crc = flash_calc_crc32(FLASH_BASE_OFFSET);
-                if (read_crc != BITSTREAM_CRC32) {
-                    print_err_file(get_filesystem(), "CRC mismatch %lX on flash, %lX prog'd\r\n", read_crc, BITSTREAM_CRC32);
-                } else {
-                    print_err_file(get_filesystem(), "CRC matched (%lX)\r\n", read_crc);
+                if (CONFIG.prog_flash) {
+                    if (read_crc != BITSTREAM_CRC32) {
+                        PRINT_ERR("CRC mismatch %lX on flash, %lX prog'd", read_crc, BITSTREAM_CRC32);
+                    } else {
+                        PRINT_INFO("CRC matched (%lX)", read_crc);
+                    }
+                    #ifdef TESTING_BUILD
+                    PRINT_TEST(read_crc == BITSTREAM_CRC32, "flash CRC check");
+                    #endif
+
                 }
+                if (!FPGA_ISDONE()) {
+                    PRINT_ERR("FPGA Done pin failed to go high. Is your bitstream valid?");
+                }
+                #ifdef TESTING_BUILD
+                test_done_program(0);
+                #endif
             }
         }
     }
@@ -336,8 +349,34 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
         return bufsize; // fake it
     struct fat_filesystem *fs = get_filesystem();
     uint8_t *addr = fs->raw_sectors[lba] + offset;
+
+    // Windows tries to mess up the file table...
+    // uint16_t bad_seq[] = {0xFFF0, 0xFFF};
+    // if (!memcmp(buffer + 10, bad_seq, sizeof(bad_seq))) {
+    //     PRINT_DEBUG("Sys info invalid FAT, fixing...");
+    //     memset(buffer + 10, 0xFF, sizeof(bad_seq));
+    // }
     memcpy(addr, buffer, bufsize);
     write_file_info(fs, 0, "ERROR", &err_file_entry); // make sure PC doesn't overwrite our err file info
+
+
+    /* Hack to update config immediately */
+    if (CONFIG.dirty) {
+        if (parse_config(get_filesystem(), &CONFIG)) {
+            // if config parse fails, set everything back to default
+            set_default_config(&CONFIG);
+            #ifdef TESTING_BUILD
+            PRINT_TEST(0, "config parse iteration %d");
+            #endif
+        } else {
+            #ifdef TESTING_BUILD
+            PRINT_TEST(1, "config parse iteration %d");
+            test_config(0);
+            #endif
+
+        }
+
+    }
     return bufsize;
 }
 
