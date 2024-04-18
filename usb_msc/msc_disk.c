@@ -16,6 +16,7 @@
 #include "error.h"
 #include "crc32.h"
 #include "tests.h"
+#include "uf2.h"
 
 
 uint8_t FLASH_WRITE_BUF[CONST_64k];
@@ -149,6 +150,10 @@ uint32_t BITSTREAM_CRC32 = 0;
 
 uint32_t BLOCK_COUNTER = 0;
 
+uint32_t firmware_flash_addr = 0;
+uint32_t firmware_block_counter = 0;
+uint32_t firmware_bytes_left = 0;
+
 // uint8_t LAST_SECTOR[DISK_CLUSTER_SIZE];
 
 uint32_t flash_calc_crc32(uint32_t addr)
@@ -200,13 +205,45 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     }
 
     if (!is_reserved_cluster) {
-        // if config is marked as dirty, reread it
-        // if (CONFIG.dirty) {
-        //     if (parse_config(get_filesystem(), &CONFIG)) {
-        //         // if config parse fails, set everything back to default
-        //         set_default_config(&CONFIG);
-        //     }
-        // }
+        if (is_uf2_block(buffer)) {
+            firmware_init_spi(CONFIG.flash_prog_speed);
+            if (!firmware_bytes_left) {
+                while (spi_flash_is_busy());
+                if (spi_flash_64k_erase_nonblocking(0)) { // todo add different index options to flash
+                    PRINT_ERR("FW Erase error @ %lX", FLASH_CURRENT_OFFSET);
+                }
+                for (uint8_t i = 0; i < bufsize; i += 256) {
+                    if (spi_flash_page_program_blocking(firmware_flash_addr, buffer + i, 256)) {
+                        PRINT_ERR("FW prog err @ %lX", firmware_flash_addr + i);
+                    }
+                    spi_flash_read(firmware_flash_addr + i, TEST_RD_BUF, 256);
+                    if (memcmp(buffer + i, TEST_RD_BUF, 256)) {
+                        PRINT_ERR("Verify error @ %lX", firmware_flash_addr + i);
+                    }
+                    firmware_flash_addr += 256;
+                    firmware_block_counter += 256;
+                }
+            } else {
+                if (firmware_block_counter >= CONST_64k) {
+                    while (spi_flash_is_busy());
+                    if (spi_flash_64k_erase_nonblocking(firmware_flash_addr)) { // todo add different index options to flash
+                        PRINT_ERR("FW Erase error @ %lX", firmware_flash_addr);
+                    }
+                    firmware_block_counter = 0;
+                }
+                for (uint8_t i = 0; i < bufsize; i += 256) {
+                    if (spi_flash_page_program_blocking(firmware_flash_addr, buffer + i, 256)) {
+                        PRINT_ERR("FW prog err @ %lX", firmware_flash_addr + i);
+                    }
+                    spi_flash_read(firmware_flash_addr + i, TEST_RD_BUF, 256);
+                    if (memcmp(buffer + i, TEST_RD_BUF, 256)) {
+                        PRINT_ERR("Verify error @ %lX", firmware_flash_addr + i);
+                    }
+                    firmware_flash_addr += 256;
+                    firmware_block_counter += 256;
+                }
+            }
+        }
 
         if (!FPGA_PROG_BYTES_LEFT) {
             FPGA_PROG_BYTES_LEFT = get_bitstream_length(buffer, bufsize);
