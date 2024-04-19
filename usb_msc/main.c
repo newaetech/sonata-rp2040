@@ -131,12 +131,25 @@ int main()
     // this stops USB from working for some reason...
     // test_basic_flash(0);
     #endif
+    PRINT_CRIT("FW_VER %d.%d.%d", FW_MAJOR_VER, FW_MINOR_VER, FW_DEBUG_VER);
 
     // check first 256 bytes to see if there's a bitstream in flash
+    uint32_t bs_len = 0;
+    for (int i = 0; i < ARR_LEN(FLASH_BITSTREAM_OFFSET); i++) {
+      spi_flash_read(FLASH_BITSTREAM_OFFSET[i], FLASH_WRITE_BUF, 256);
+      bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
+      if (bs_len > 0) {
+        PRINT_INFO("Bitstream found in slot %d", i);
+      } else {
+        PRINT_INFO("No bitstream in slot %d", i);
+      }
+    }
+
+    PRINT_INFO("Using slot %d", read_bitstream_select_pins());
+
     uint32_t bitstream_offset = flash_get_bitstream_offset();
-    PRINT_INFO("Checking bitstream offset %lX", bitstream_offset);
     spi_flash_read(bitstream_offset, FLASH_WRITE_BUF, 256); // whatever, just duplicate the reads...
-    uint32_t bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
+    bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
 
     if (bs_len > 0) {
       // TODO: calc/record CRC
