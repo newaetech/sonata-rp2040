@@ -232,8 +232,6 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                     bitstream_init_spi(CONFIG.flash_prog_speed);
 
                     // erase 64k of flash
-                    while (spi_flash_is_busy());
-                    spi_flash_64k_erase_nonblocking(FLASH_CURRENT_OFFSET); // todo add different index options to flash
                     BLOCK_COUNTER = 0;
 
                     // copy into buffer, but not past
@@ -245,6 +243,8 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
                     FLASH_BASE_OFFSET = flash_get_bitstream_offset();
                     PRINT_INFO("Using offset %lX", FLASH_BASE_OFFSET);
+                    while (spi_flash_is_busy());
+                    spi_flash_64k_erase_nonblocking(FLASH_BASE_OFFSET); // todo add different index options to flash
 
                     BITSTREAM_CRC32 = 0x00;
                     FLASH_TOTAL_PROG_BYTES = 0;
