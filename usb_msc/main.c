@@ -165,6 +165,7 @@ int main()
         flash_addr += read_len;
         PRINT_DEBUG("Prog %lX bytes, %lX left", read_len, bs_len);
       }
+      PRINT_INFO("Finished programming");
     } else {
       PRINT_INFO("No bitstream in flash @ %lX", bitstream_offset);
     }
