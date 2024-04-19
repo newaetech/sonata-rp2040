@@ -15,3 +15,7 @@
 #define BE_2U8_TO_U16(X) ((X)[1] | ((X)[0] << 8))
 
 #define ARR_LEN(X) ((sizeof(X)) / (sizeof(X[0])))
+
+#define FW_MAJOR_VER 0
+#define FW_MINOR_VER 1
+#define FW_DEBUG_VER 1
