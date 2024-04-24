@@ -153,6 +153,7 @@ uint32_t BLOCK_COUNTER = 0;
 uint32_t firmware_flash_addr = 0;
 uint32_t firmware_block_counter = 0;
 uint32_t firmware_bytes_left = 0;
+uint32_t firmware_crc32 = 0;
 
 // uint8_t LAST_SECTOR[DISK_CLUSTER_SIZE];
 
@@ -207,177 +208,187 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     if (!is_reserved_cluster) {
         if (is_uf2_block(buffer)) {
             firmware_init_spi(CONFIG.flash_prog_speed);
-            if (!firmware_bytes_left) {
+            struct UF2_Block *start_blk = (struct UF2_Block *)(buffer);
+            if (!start_blk->blockNo) {
+                PRINT_INFO("Starting firmware program of %lX blocks", start_blk->numBlocks);
+                firmware_block_counter = 0;
+                firmware_flash_addr = 0;
+                firmware_crc32 = 0;
                 while (spi_flash_is_busy());
-                if (spi_flash_64k_erase_nonblocking(0)) { // todo add different index options to flash
-                    PRINT_ERR("FW Erase error @ %lX", FLASH_CURRENT_OFFSET);
+                if (spi_flash_64k_erase_nonblocking(firmware_flash_addr)) { // todo add different index options to flash
+                    PRINT_ERR("FW Erase error @ %lX", firmware_flash_addr);
                 }
-                for (uint8_t i = 0; i < bufsize; i += 256) {
-                    if (spi_flash_page_program_blocking(firmware_flash_addr, buffer + i, 256)) {
-                        PRINT_ERR("FW prog err @ %lX", firmware_flash_addr + i);
-                    }
-                    spi_flash_read(firmware_flash_addr + i, TEST_RD_BUF, 256);
-                    if (memcmp(buffer + i, TEST_RD_BUF, 256)) {
-                        PRINT_ERR("Verify error @ %lX", firmware_flash_addr + i);
-                    }
-                    firmware_flash_addr += 256;
-                    firmware_block_counter += 256;
+                while (spi_flash_is_busy());
+            }
+
+            // if in next 64k, erase
+            if (firmware_block_counter >= CONST_64k) {
+                while (spi_flash_is_busy());
+                if (spi_flash_64k_erase_nonblocking(firmware_flash_addr)) { // todo add different index options to flash
+                    PRINT_ERR("FW Erase error @ %lX", firmware_flash_addr);
                 }
-            } else {
-                if (firmware_block_counter >= CONST_64k) {
-                    while (spi_flash_is_busy());
-                    if (spi_flash_64k_erase_nonblocking(firmware_flash_addr)) { // todo add different index options to flash
-                        PRINT_ERR("FW Erase error @ %lX", firmware_flash_addr);
-                    }
-                    firmware_block_counter = 0;
+                while (spi_flash_is_busy());
+                firmware_block_counter = 0;
+            }
+
+            // program data
+            for (uint32_t i = 0; i < bufsize; i += 256) {
+                if (spi_flash_page_program_blocking(firmware_flash_addr, buffer + i, 256)) {
+                    PRINT_ERR("FW prog err @ %lX", firmware_flash_addr + i);
                 }
-                for (uint8_t i = 0; i < bufsize; i += 256) {
-                    if (spi_flash_page_program_blocking(firmware_flash_addr, buffer + i, 256)) {
-                        PRINT_ERR("FW prog err @ %lX", firmware_flash_addr + i);
-                    }
-                    spi_flash_read(firmware_flash_addr + i, TEST_RD_BUF, 256);
-                    if (memcmp(buffer + i, TEST_RD_BUF, 256)) {
-                        PRINT_ERR("Verify error @ %lX", firmware_flash_addr + i);
-                    }
-                    firmware_flash_addr += 256;
-                    firmware_block_counter += 256;
+                spi_flash_read(firmware_flash_addr, TEST_RD_BUF, 256);
+                if (memcmp(buffer + i, TEST_RD_BUF, 256)) {
+                    PRINT_ERR("Verify error @ %lX", firmware_flash_addr + i);
                 }
+                firmware_block_counter += 256;
+                firmware_flash_addr += 256;
+            }
+
+            firmware_crc32 = crc32c(firmware_crc32, buffer, bufsize);
+
+            struct UF2_Block *end_blk = (struct UF2_Block *)(buffer + bufsize - sizeof(struct UF2_Block));
+            if ((end_blk->blockNo >= (end_blk->numBlocks) - 1)) {
+                firmware_block_counter = 0;
+                firmware_flash_addr = 0;
+                PRINT_INFO("Finished programming of %lX blocks, CRC = %lX, verifying...", end_blk->blockNo, firmware_crc32);
             }
         }
 
-        if (!FPGA_PROG_BYTES_LEFT) {
-            FPGA_PROG_BYTES_LEFT = get_bitstream_length(buffer, bufsize);
-            if (FPGA_PROG_BYTES_LEFT) {
-                fpga_program_init(CONFIG.fpga_prog_speed);
-                fpga_program_setup1(); // nprog low to erase
-                // board_millis() seems to not work properly (not done by interrupt?)
-                for (volatile uint32_t i = 0; i < 5000; i++);
-                fpga_program_setup2(); // nprog back high
-                for (volatile uint32_t i = 0; i < 5000; i++); // need to wait a bit after this before we start programming, 5ms from datasheet info
-                PRINT_INFO("Programming %lX bytes", FPGA_PROG_BYTES_LEFT);
+        if (!is_uf2_block(buffer)) {
+            if (!FPGA_PROG_BYTES_LEFT) {
+                FPGA_PROG_BYTES_LEFT = get_bitstream_length(buffer, bufsize);
+                if (FPGA_PROG_BYTES_LEFT) {
+                    fpga_program_init(CONFIG.fpga_prog_speed);
+                    fpga_program_setup1(); // nprog low to erase
+                    // board_millis() seems to not work properly (not done by interrupt?)
+                    for (volatile uint32_t i = 0; i < 5000; i++);
+                    fpga_program_setup2(); // nprog back high
+                    for (volatile uint32_t i = 0; i < 5000; i++); // need to wait a bit after this before we start programming, 5ms from datasheet info
+                    PRINT_INFO("Programming %lX bytes", FPGA_PROG_BYTES_LEFT);
 
+                    bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
+                    FPGA_TOTAL_PROG_BYTES = FPGA_PROG_BYTES_LEFT;
+                    FLASH_PROG_BYTES_LEFT = FPGA_PROG_BYTES_LEFT;
+                    fpga_program_sendchunk(buffer, bufsize);
+                    FPGA_PROG_BYTES_LEFT -= bufsize;
+                    FLASH_CURRENT_OFFSET = 0; // offset in actual flash
+                    FLASH_BUF_CURRENT_OFFSET = 0; // offset in our buffer
+
+
+                    if (CONFIG.prog_flash) {
+                        bitstream_init_spi(CONFIG.flash_prog_speed);
+
+                        // erase 64k of flash
+                        BLOCK_COUNTER = 0;
+
+                        // copy into buffer, but not past
+                        bufsize = min(bufsize, (CONST_64k - SPI_FLASH_BUF_INDEX));
+                        memcpy(FLASH_WRITE_BUF + FLASH_BUF_CURRENT_OFFSET, buffer, bufsize);
+
+                        // update offsets with new data
+                        FLASH_BUF_CURRENT_OFFSET += bufsize;
+
+                        FLASH_BASE_OFFSET = flash_get_bitstream_offset();
+                        PRINT_INFO("Using offset %lX", FLASH_BASE_OFFSET);
+                        while (spi_flash_is_busy());
+                        spi_flash_64k_erase_nonblocking(FLASH_BASE_OFFSET); // todo add different index options to flash
+
+                        BITSTREAM_CRC32 = 0x00;
+                        FLASH_TOTAL_PROG_BYTES = 0;
+                    }
+                }
+
+            } else {
+                // this should be okay for now, may rework to follow file table to handle
+                // writing to multiple files at a time
                 bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
-                FPGA_TOTAL_PROG_BYTES = FPGA_PROG_BYTES_LEFT;
-                FLASH_PROG_BYTES_LEFT = FPGA_PROG_BYTES_LEFT;
-                fpga_program_sendchunk(buffer, bufsize);
-                FPGA_PROG_BYTES_LEFT -= bufsize;
-                FLASH_CURRENT_OFFSET = 0; // offset in actual flash
-                FLASH_BUF_CURRENT_OFFSET = 0; // offset in our buffer
-
-
-                if (CONFIG.prog_flash) {
+                if (CONFIG.prog_flash && FLASH_PROG_BYTES_LEFT) {
                     bitstream_init_spi(CONFIG.flash_prog_speed);
 
-                    // erase 64k of flash
-                    BLOCK_COUNTER = 0;
+                    // if at the beginning of our buffer, erase 64k of flash
+                    // todo just keep track of flash length separate from fpga length
+                    if (BLOCK_COUNTER >= 0x10000) {
+                        while (spi_flash_is_busy());
+                        if (spi_flash_64k_erase_nonblocking(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET)) { // todo add different index options to flash
+                            PRINT_ERR("Erase error @ %lX", FLASH_CURRENT_OFFSET);
+                        }
+                        BLOCK_COUNTER = 0;
+                    }
 
-                    // copy into buffer, but not past
+                    // write into buffer, but not past
                     bufsize = min(bufsize, (CONST_64k - SPI_FLASH_BUF_INDEX));
+                    bufsize = min(bufsize, (CONST_64k - FLASH_PROG_BYTES_LEFT));
+                    // bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT); // have to do this again...
+                    // if (bufsize + BLOCK_COUNTER > CONST_64k) bufsize = CONST_64k - BLOCK_COUNTER;
                     memcpy(FLASH_WRITE_BUF + FLASH_BUF_CURRENT_OFFSET, buffer, bufsize);
 
-                    // update offsets with new data
+                    // update our buf offset
                     FLASH_BUF_CURRENT_OFFSET += bufsize;
 
-                    FLASH_BASE_OFFSET = flash_get_bitstream_offset();
-                    PRINT_INFO("Using offset %lX", FLASH_BASE_OFFSET);
-                    while (spi_flash_is_busy());
-                    spi_flash_64k_erase_nonblocking(FLASH_BASE_OFFSET); // todo add different index options to flash
+                    // if we've maxed out the buffer
+                    if ((FLASH_BUF_CURRENT_OFFSET >= CONST_64k) // if we're at the end of our buffer
+                    || (FLASH_BUF_CURRENT_OFFSET >= FLASH_PROG_BYTES_LEFT)) {  // or the end of the file
 
-                    BITSTREAM_CRC32 = 0x00;
-                    FLASH_TOTAL_PROG_BYTES = 0;
-                }
-            }
-
-        } else {
-            // this should be okay for now, may rework to follow file table to handle
-            // writing to multiple files at a time
-            bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT);
-            if (CONFIG.prog_flash && FLASH_PROG_BYTES_LEFT) {
-                bitstream_init_spi(CONFIG.flash_prog_speed);
-
-                // if at the beginning of our buffer, erase 64k of flash
-                // todo just keep track of flash length separate from fpga length
-                if (BLOCK_COUNTER >= 0x10000) {
-                    while (spi_flash_is_busy());
-                    if (spi_flash_64k_erase_nonblocking(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET)) { // todo add different index options to flash
-                        PRINT_ERR("Erase error @ %lX", FLASH_CURRENT_OFFSET);
-                    }
-                    BLOCK_COUNTER = 0;
-                }
-
-                // write into buffer, but not past
-                bufsize = min(bufsize, (CONST_64k - SPI_FLASH_BUF_INDEX));
-                bufsize = min(bufsize, (CONST_64k - FLASH_PROG_BYTES_LEFT));
-                // bufsize = min(bufsize, FPGA_PROG_BYTES_LEFT); // have to do this again...
-                // if (bufsize + BLOCK_COUNTER > CONST_64k) bufsize = CONST_64k - BLOCK_COUNTER;
-                memcpy(FLASH_WRITE_BUF + FLASH_BUF_CURRENT_OFFSET, buffer, bufsize);
-
-                // update our buf offset
-                FLASH_BUF_CURRENT_OFFSET += bufsize;
-
-                // if we've maxed out the buffer
-                if ((FLASH_BUF_CURRENT_OFFSET >= CONST_64k) // if we're at the end of our buffer
-                 || (FLASH_BUF_CURRENT_OFFSET >= FLASH_PROG_BYTES_LEFT)) {  // or the end of the file
-
-                    while (spi_flash_is_busy());
-                    if (FLASH_BUF_CURRENT_OFFSET >= FLASH_PROG_BYTES_LEFT) {
-                        FLASH_BUF_CURRENT_OFFSET = FLASH_PROG_BYTES_LEFT;
-                        PRINT_DEBUG("Prog %lX bytes", FLASH_BUF_CURRENT_OFFSET);
-                    }
-                    uint32_t i = 0;
-                    while (i < FLASH_BUF_CURRENT_OFFSET) {
-                        uint16_t write_len = min(256, FLASH_BUF_CURRENT_OFFSET - i); // can write up to 256 bytes at a time
-
-                        // program in the current offset in flash
-                        if (spi_flash_page_program_blocking(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET, FLASH_WRITE_BUF + i, write_len)) {// do the write
-                            PRINT_ERR("Prog error @ %lX", FLASH_CURRENT_OFFSET);
-                            
+                        while (spi_flash_is_busy());
+                        if (FLASH_BUF_CURRENT_OFFSET >= FLASH_PROG_BYTES_LEFT) {
+                            FLASH_BUF_CURRENT_OFFSET = FLASH_PROG_BYTES_LEFT;
+                            PRINT_DEBUG("Prog %lX bytes", FLASH_BUF_CURRENT_OFFSET);
                         }
-                        // BITSTREAM_CRC32 = crc32c(BITSTREAM_CRC32, FLASH_WRITE_BUF + i, write_len);
+                        uint32_t i = 0;
+                        while (i < FLASH_BUF_CURRENT_OFFSET) {
+                            uint16_t write_len = min(256, FLASH_BUF_CURRENT_OFFSET - i); // can write up to 256 bytes at a time
 
-                        // and verify what we wrote
-                        spi_flash_read(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET, TEST_RD_BUF, write_len);
-                        if (memcmp(FLASH_WRITE_BUF + i, TEST_RD_BUF, write_len)) {
-                            PRINT_ERR("Verify error @ %lX", FLASH_CURRENT_OFFSET);
+                            // program in the current offset in flash
+                            if (spi_flash_page_program_blocking(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET, FLASH_WRITE_BUF + i, write_len)) {// do the write
+                                PRINT_ERR("Prog error @ %lX", FLASH_CURRENT_OFFSET);
+                                
+                            }
+                            // BITSTREAM_CRC32 = crc32c(BITSTREAM_CRC32, FLASH_WRITE_BUF + i, write_len);
+
+                            // and verify what we wrote
+                            spi_flash_read(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET, TEST_RD_BUF, write_len);
+                            if (memcmp(FLASH_WRITE_BUF + i, TEST_RD_BUF, write_len)) {
+                                PRINT_ERR("Verify error @ %lX", FLASH_CURRENT_OFFSET);
+                            }
+                            i += write_len;
+                            BLOCK_COUNTER += write_len;
+                            FLASH_CURRENT_OFFSET += write_len;
+                            FLASH_TOTAL_PROG_BYTES += write_len;
+                            FLASH_PROG_BYTES_LEFT -= write_len;
                         }
-                        i += write_len;
-                        BLOCK_COUNTER += write_len;
-                        FLASH_CURRENT_OFFSET += write_len;
-                        FLASH_TOTAL_PROG_BYTES += write_len;
-                        FLASH_PROG_BYTES_LEFT -= write_len;
+
+                        // update flash offset and set our buf offset to 0
+                        // FLASH_CURRENT_OFFSET += FLASH_BUF_CURRENT_OFFSET;
+                        // BLOCK_COUNTER += FLASH_BUF_CURRENT_OFFSET;
+                        BITSTREAM_CRC32 = crc32c(BITSTREAM_CRC32, FLASH_WRITE_BUF, FLASH_BUF_CURRENT_OFFSET);
+                        PRINT_DEBUG("Prog %lX bytes, CRC = %lX, %lX bytes left, bufsize %lX, total prog = %lX", FLASH_BUF_CURRENT_OFFSET, BITSTREAM_CRC32, FLASH_PROG_BYTES_LEFT, bufsize, FLASH_TOTAL_PROG_BYTES);
+                        FLASH_BUF_CURRENT_OFFSET = 0;
+                    } 
+                }
+                fpga_program_sendchunk(buffer, bufsize);
+                FPGA_PROG_BYTES_LEFT -= bufsize;
+
+                if (!FPGA_PROG_BYTES_LEFT) {
+                    PRINT_INFO("Finished programming %lX bytes, verifying CRC", FPGA_TOTAL_PROG_BYTES);
+                    uint32_t read_crc = flash_calc_crc32(FLASH_BASE_OFFSET);
+                    if (CONFIG.prog_flash) {
+                        if (read_crc != BITSTREAM_CRC32) {
+                            PRINT_ERR("CRC mismatch %lX on flash, %lX prog'd", read_crc, BITSTREAM_CRC32);
+                        } else {
+                            PRINT_INFO("CRC matched (%lX)", read_crc);
+                        }
+                        #ifdef TESTING_BUILD
+                        PRINT_TEST(read_crc == BITSTREAM_CRC32, "flash CRC check");
+                        #endif
+
                     }
-
-                    // update flash offset and set our buf offset to 0
-                    // FLASH_CURRENT_OFFSET += FLASH_BUF_CURRENT_OFFSET;
-                    // BLOCK_COUNTER += FLASH_BUF_CURRENT_OFFSET;
-                    BITSTREAM_CRC32 = crc32c(BITSTREAM_CRC32, FLASH_WRITE_BUF, FLASH_BUF_CURRENT_OFFSET);
-                    PRINT_DEBUG("Prog %lX bytes, CRC = %lX, %lX bytes left, bufsize %lX, total prog = %lX", FLASH_BUF_CURRENT_OFFSET, BITSTREAM_CRC32, FLASH_PROG_BYTES_LEFT, bufsize, FLASH_TOTAL_PROG_BYTES);
-                    FLASH_BUF_CURRENT_OFFSET = 0;
-                } 
-            }
-            fpga_program_sendchunk(buffer, bufsize);
-            FPGA_PROG_BYTES_LEFT -= bufsize;
-
-            if (!FPGA_PROG_BYTES_LEFT) {
-                PRINT_INFO("Finished programming %lX bytes, verifying CRC", FPGA_TOTAL_PROG_BYTES);
-                uint32_t read_crc = flash_calc_crc32(FLASH_BASE_OFFSET);
-                if (CONFIG.prog_flash) {
-                    if (read_crc != BITSTREAM_CRC32) {
-                        PRINT_ERR("CRC mismatch %lX on flash, %lX prog'd", read_crc, BITSTREAM_CRC32);
-                    } else {
-                        PRINT_INFO("CRC matched (%lX)", read_crc);
+                    if (!FPGA_ISDONE()) {
+                        PRINT_ERR("FPGA Done pin failed to go high. Is your bitstream valid?");
                     }
                     #ifdef TESTING_BUILD
-                    PRINT_TEST(read_crc == BITSTREAM_CRC32, "flash CRC check");
+                    test_done_program(0);
                     #endif
-
                 }
-                if (!FPGA_ISDONE()) {
-                    PRINT_ERR("FPGA Done pin failed to go high. Is your bitstream valid?");
-                }
-                #ifdef TESTING_BUILD
-                test_done_program(0);
-                #endif
             }
         }
     }

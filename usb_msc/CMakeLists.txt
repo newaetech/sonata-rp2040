@@ -12,6 +12,7 @@ target_sources(usb_msc PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/error.c
         ${CMAKE_CURRENT_LIST_DIR}/crc32.c
         ${CMAKE_CURRENT_LIST_DIR}/tests.c
+        ${CMAKE_CURRENT_LIST_DIR}/uf2.c
         )
 
 target_include_directories(usb_msc PUBLIC
