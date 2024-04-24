@@ -40,7 +40,7 @@ for num, result in enumerate(results):
             print("Failed test {}".format(str(result)))
             any_failures = 1
 
-with open('ERROR.txt', "w") as f:
+with open('LOG.txt', "w") as f:
     f.write(str(full_file))
 
 if not any_failures:

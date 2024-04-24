@@ -14,7 +14,7 @@ volatile uint32_t TESTING_COUNTER = 0;
 
 int print_err_file(struct fat_filesystem *fs, const char *fmt, ...)
 {
-    int32_t err = get_file_info(fs, 0, "ERROR", &err_file_entry);
+    int32_t err = get_file_info(fs, 0, "LOG", &err_file_entry);
     if (err) return -1;
 
     uint16_t file_cluster = LE_2U8_TO_U16(err_file_entry.starting_cluster);
