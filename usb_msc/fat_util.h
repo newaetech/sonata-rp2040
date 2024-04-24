@@ -64,7 +64,7 @@ static uint32_t sector_to_cluster(uint32_t sector)
     "\r\n" \
     ""
 
-#define ERROR_CONTENTS \
+#define LOG_CONTENTS \
     "\r\n" \
     ""
 

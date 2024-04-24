@@ -88,7 +88,7 @@ def write_all_options(sonata_path):
 
 def get_test_results(sonata_path):
     results = []
-    option_file = open(sonata_path + "/ERROR.txt", "r")
+    option_file = open(sonata_path + "/LOG.txt", "r")
     string = option_file.read()
     option_file.close()
 

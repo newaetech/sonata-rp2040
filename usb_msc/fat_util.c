@@ -30,12 +30,12 @@ static struct fat_filesystem FILESYSTEM = {
                 0xFF, 0xFF, // End of chain indicator (reserved cluster?)
                 0xFF, 0xFF, // cluster 2 (README.txt in our case)
                 0xFF, 0xFF, // cluster 3 (OPTIONS.txt in our case)
-                // NOTE: doing the ERROR.txt alloc manually, could do it with a func in the future
-                0xFF, 0xFF, // cluster 4 (ERROR.txt in our case)
-                // 0x05, 0x00, // cluster 4 (ERROR.txt in our case)
-                // 0x06, 0x00, // cluster 4 (error.txt in our case)
-                // 0x07, 0x00, // cluster 4 (ERROR.txt in our case)
-                // 0xFF, 0xFF, // cluster 4 (ERROR.txt in our case)
+                // NOTE: doing the LOG.txt alloc manually, could do it with a func in the future
+                0xFF, 0xFF, // cluster 4 (LOG.txt in our case)
+                // 0x05, 0x00, // cluster 4 (LOG.txt in our case)
+                // 0x06, 0x00, // cluster 4 (LOG.txt in our case)
+                // 0x07, 0x00, // cluster 4 (LOG.txt in our case)
+                // 0xFF, 0xFF, // cluster 4 (LOG.txt in our case)
             }},
     .root_dir = {{
                     .filename = {'S', 'O', 'N', 'A', 'T', 'A', ' ', ' '}, // name
@@ -59,7 +59,7 @@ static struct fat_filesystem FILESYSTEM = {
                     .starting_cluster = {0x03, 0x00}, .file_size = {LE_U32_TO_4U8(sizeof(OPTIONS_CONTENTS) - 1)}
                 },
                 {
-                    .filename = {'E', 'R', 'R', 'O', 'R', ' ', ' ', ' '}, 
+                    .filename = {'L', 'O', 'G', ' ', ' ', ' ', ' ', ' '}, 
                     .extension = {'T', 'X', 'T'}, .creation_time = {0x52, 0x6D},
                     .creation_date = {0x65, 0x43}, .last_access_date = {0x65, 0x43}, 
                     .time_stamp = {0x88, 0x6D}, .date_stamp = {0x65, 0x43}, 

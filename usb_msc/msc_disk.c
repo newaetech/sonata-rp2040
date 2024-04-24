@@ -181,7 +181,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     uint8_t is_reserved_cluster = 0; // should change to "is known file/folder"
 
     int32_t reserved_clusters[] = {0, 1, get_file_cluster(get_filesystem(), 0, "README"), 
-        get_file_cluster(get_filesystem(), 0, "OPTIONS"), get_file_cluster(get_filesystem(), 0, "ERROR")};
+        get_file_cluster(get_filesystem(), 0, "OPTIONS"), get_file_cluster(get_filesystem(), 0, "LOG")};
 
     int32_t opt_cluster = get_file_cluster(get_filesystem(), 0, "OPTIONS");
 
@@ -357,7 +357,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     //     memset(buffer + 10, 0xFF, sizeof(bad_seq));
     // }
     memcpy(addr, buffer, bufsize);
-    write_file_info(fs, 0, "ERROR", &err_file_entry); // make sure PC doesn't overwrite our err file info
+    write_file_info(fs, 0, "LOG", &err_file_entry); // make sure PC doesn't overwrite our err file info
 
 
     /* Hack to update config immediately */
