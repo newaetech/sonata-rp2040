@@ -37,3 +37,4 @@ struct extension_tag {
 
 int is_uf2_block(struct UF2_Block *block);
 int uf2_get_sha(struct UF2_Block *block, struct extension_tag *sha);
+int uf2_is_last_block(struct UF2_Block *block);

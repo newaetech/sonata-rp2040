@@ -144,7 +144,7 @@ uint32_t FLASH_BASE_OFFSET = 0;
 // Callback invoked when received WRITE10 command.
 // Process data in buffer to disk's storage and return number of written bytes
 
-uint8_t TEST_RD_BUF[256];
+uint8_t TEST_RD_BUF[512];
 
 uint32_t BITSTREAM_CRC32 = 0;
 
@@ -156,6 +156,21 @@ uint32_t firmware_bytes_left = 0;
 uint32_t firmware_crc32 = 0;
 
 // uint8_t LAST_SECTOR[DISK_CLUSTER_SIZE];
+
+uint32_t firmware_calc_crc(uint32_t addr)
+{
+    uint32_t crc = 0;
+    uint32_t uf2_sz = sizeof(struct UF2_Block);
+    struct UF2_Block read_block;
+    uint32_t i = 0;
+    for (i = 0; i < DISK_FULL_SIZE; i += uf2_sz) {
+        spi_flash_read(i + addr, &read_block, uf2_sz);
+        crc = crc32c(crc, &read_block, uf2_sz);
+        if (uf2_is_last_block(&read_block)) break;
+    }
+    PRINT_INFO("Read %lX bytes from flash", i);
+    return crc;
+}
 
 uint32_t flash_calc_crc32(uint32_t addr)
 {
@@ -206,7 +221,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     }
 
     if (!is_reserved_cluster) {
-        if (is_uf2_block(buffer)) {
+        if (is_uf2_block((void *)buffer)) {
             firmware_init_spi(CONFIG.flash_prog_speed);
             struct UF2_Block *start_blk = (struct UF2_Block *)(buffer);
             if (!start_blk->blockNo) {
@@ -214,6 +229,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                 firmware_block_counter = 0;
                 firmware_flash_addr = 0;
                 firmware_crc32 = 0;
+                PRINT_INFO("Erasing @ %lX", firmware_flash_addr);
                 while (spi_flash_is_busy());
                 if (spi_flash_64k_erase_nonblocking(firmware_flash_addr)) { // todo add different index options to flash
                     PRINT_ERR("FW Erase error @ %lX", firmware_flash_addr);
@@ -223,6 +239,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
             // if in next 64k, erase
             if (firmware_block_counter >= CONST_64k) {
+                PRINT_INFO("Erasing @ %lX", firmware_flash_addr);
                 while (spi_flash_is_busy());
                 if (spi_flash_64k_erase_nonblocking(firmware_flash_addr)) { // todo add different index options to flash
                     PRINT_ERR("FW Erase error @ %lX", firmware_flash_addr);
@@ -232,29 +249,44 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
             }
 
             // program data
-            for (uint32_t i = 0; i < bufsize; i += 256) {
-                if (spi_flash_page_program_blocking(firmware_flash_addr, buffer + i, 256)) {
-                    PRINT_ERR("FW prog err @ %lX", firmware_flash_addr + i);
+            for (uint32_t i = 0; i < bufsize; i += 512) {
+                // do 2 256 byte programs
+                struct UF2_Block *cur_blk = (struct UF2_Block *)(buffer + i);
+                if (is_uf2_block(cur_blk)) {
+                    if (spi_flash_page_program_blocking(firmware_flash_addr, buffer + i, 256)) {
+                        PRINT_ERR("FW prog err @ %lX", firmware_flash_addr + i);
+                    }
+                    if (spi_flash_page_program_blocking(firmware_flash_addr + 256, buffer + i + 256, 256)) {
+                        PRINT_ERR("FW prog err @ %lX", firmware_flash_addr + i);
+                    }
+                    firmware_crc32 = crc32c(firmware_crc32, buffer + i, 512);
+                    // PRINT_INFO("CRC = %lX", firmware_crc32);
+
+                    spi_flash_read(firmware_flash_addr, TEST_RD_BUF, 512);
+                    if (memcmp(buffer + i, TEST_RD_BUF, 512)) {
+                        PRINT_ERR("Verify error @ %lX", firmware_flash_addr + i);
+                    }
+
+                    firmware_block_counter += 512;
+                    firmware_flash_addr += 512;
+                    // if (firmware_flash_addr >= 0x30000) PRINT_INFO("%lX %d", cur_blk->blockNo, uf2_is_last_block(cur_blk));
+
+                    if (uf2_is_last_block(cur_blk)) {
+                        firmware_block_counter = 0;
+                        firmware_flash_addr = 0;
+                        PRINT_INFO("Finished programming of %lX blocks, CRC = %lX, verifying...", 
+                            cur_blk->blockNo, firmware_crc32);
+                        uint32_t read_crc = firmware_calc_crc(0x00);
+                        if (read_crc != firmware_crc32) {
+                            PRINT_ERR("CRC mismatch %lX on flash, %lX prog'd", read_crc, firmware_crc32);
+                        } else {
+                            PRINT_INFO("CRC matched")
+                        }
+                        break;
+                    }
                 }
-                spi_flash_read(firmware_flash_addr, TEST_RD_BUF, 256);
-                if (memcmp(buffer + i, TEST_RD_BUF, 256)) {
-                    PRINT_ERR("Verify error @ %lX", firmware_flash_addr + i);
-                }
-                firmware_block_counter += 256;
-                firmware_flash_addr += 256;
             }
-
-            firmware_crc32 = crc32c(firmware_crc32, buffer, bufsize);
-
-            struct UF2_Block *end_blk = (struct UF2_Block *)(buffer + bufsize - sizeof(struct UF2_Block));
-            if ((end_blk->blockNo >= (end_blk->numBlocks) - 1)) {
-                firmware_block_counter = 0;
-                firmware_flash_addr = 0;
-                PRINT_INFO("Finished programming of %lX blocks, CRC = %lX, verifying...", end_blk->blockNo, firmware_crc32);
-            }
-        }
-
-        if (!is_uf2_block(buffer)) {
+        } else {
             if (!FPGA_PROG_BYTES_LEFT) {
                 FPGA_PROG_BYTES_LEFT = get_bitstream_length(buffer, bufsize);
                 if (FPGA_PROG_BYTES_LEFT) {

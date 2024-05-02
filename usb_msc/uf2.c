@@ -1,5 +1,6 @@
 #include "uf2.h"
 #include <stdlib.h>
+#include <string.h>
 
 int is_uf2_block(struct UF2_Block *block)
 {
@@ -26,5 +27,12 @@ int uf2_get_sha(struct UF2_Block *block, struct extension_tag *sha)
         tag_loc_typed = (struct extension_tag *)tag_loc;
     }
     memcpy(sha, tag_loc_typed, tag_loc_typed->total_size);
+    return 0;
+}
+
+int uf2_is_last_block(struct UF2_Block *block)
+{
+    if (!is_uf2_block(block)) return 1;
+    if (block->blockNo >= (block->numBlocks - 1)) return 1;
     return 0;
 }

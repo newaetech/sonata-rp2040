@@ -19,6 +19,8 @@
 #include "flash_util.h"
 #include "util.h"
 #include "error.h"
+#include "crc32.h"
+#include "tests.h"
 
 #define spi_default PICO_DEFAULT_SPI_INSTANCE
 #define FPGA_CONFIG_LED 18
@@ -101,6 +103,34 @@ uint32_t flash_get_bitstream_offset(void)
     return FLASH_BITSTREAM_OFFSET[pin];
 }
 
+static uint8_t test_rdmem[256];
+static uint8_t test_mem[256];
+
+void xor_fill_buf(uint32_t *buf, int len, uint32_t seed);
+
+int test_fw_flash(void)
+{
+    firmware_init_spi(10E6);
+    int passed = 1;
+    for (uint32_t i = 0; i < sizeof(test_mem); i++) test_mem[i] = i;
+    spi_flash_sector_erase_blocking(0x00);
+    spi_flash_read(0x00, test_rdmem, sizeof(test_rdmem));
+    for (uint16_t i = 0; i < ARR_LEN(test_rdmem); i++) {
+        if ((test_rdmem[i] != 0xFF)) { // erased mem is 0xFF
+            passed = 0;
+        }
+    }
+    PRINT_CRIT("Erase flash %d", passed);
+
+    passed = 1;
+    xor_fill_buf((void *)test_mem, 256, 0x11223344);
+    spi_flash_page_program_blocking(0, test_mem, sizeof(test_mem));
+    spi_flash_read(0, test_rdmem, sizeof(test_rdmem));
+    if (memcmp(test_mem, test_rdmem, sizeof(test_rdmem))) passed = 0;
+    PRINT_CRIT("Program flash %d", passed);
+    return passed;
+}
+
 uint16_t initial_fat[] = {0xFFF8, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 
 int main() 
@@ -113,7 +143,7 @@ int main()
     // zero and reinit fat upon boot
     // memset(get_filesystem()->fat, 0, DISK_SECTOR_PER_FAT*DISK_SECTOR_SIZE);
     // memcpy(get_filesystem()->fat, initial_fat, sizeof(initial_fat));
-    memset(get_filesystem()->clusters[3], ' ', DISK_CLUSTER_SIZE); // IDK why this cluster has to be all spaces on Windows...
+    // memset(get_filesystem()->clusters[3], ' ', DISK_CLUSTER_SIZE); // IDK why this cluster has to be all spaces on Windows...
 
     // Setup LEDs
     for (uint8_t i =0; i < ARR_LEN(USER_LEDS); i++) {
@@ -132,6 +162,7 @@ int main()
     // test_basic_flash(0);
     #endif
     PRINT_CRIT("FW_VER %d.%d.%d", FW_MAJOR_VER, FW_MINOR_VER, FW_DEBUG_VER);
+    // test_fw_flash();
 
     // check first 256 bytes to see if there's a bitstream in flash
     uint32_t bs_len = 0;
@@ -157,15 +188,17 @@ int main()
       fpga_erase();
       PRINT_INFO("Bitstream in flash @ %lX, programming %lX bytes...", bitstream_offset, bs_len);
       uint32_t flash_addr = bitstream_offset;
+      uint32_t crc = 0x00;
       while (bs_len) {
         uint32_t read_len = min(sizeof(FLASH_WRITE_BUF), bs_len);
         spi_flash_read(flash_addr, FLASH_WRITE_BUF, read_len);
         fpga_program_sendchunk(FLASH_WRITE_BUF, read_len);
+        crc = crc32c(crc, FLASH_WRITE_BUF, read_len);
         bs_len -= read_len;
         flash_addr += read_len;
         PRINT_DEBUG("Prog %lX bytes, %lX left", read_len, bs_len);
       }
-      PRINT_INFO("Finished programming");
+      PRINT_INFO("Finished programming CRC=%lX", crc);
     } else {
       PRINT_INFO("No bitstream in flash @ %lX", bitstream_offset);
     }

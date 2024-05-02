@@ -69,7 +69,10 @@ enum firmware_spi_pins {
     FW_SPI_DI = 3, // QSPI_D0
     FW_SPI_DO = 0, // QSPI_D1
     FW_SPI_CLK = 2, // QSPI_SCLK
-    FW_SPI_CS = 1 //QSPI_CS
+    FW_SPI_CS = 1, //QSPI_CS
+    // NOTE: For single bit SPI, set these both high
+    FW_SPI_W_NEN = 4, // QSPI_D2/write enable (low)
+    FW_SPI_NHOLD = 5 // QSPI_D3/hold (low)
 };
 
 int SPI_FLASH_CS_PIN = 0;
@@ -159,6 +162,16 @@ void firmware_init_spi(uint32_t baud)
     gpio_set_function(FW_SPI_DI, GPIO_FUNC_SPI); // RX pin
     gpio_set_function(FW_SPI_DO, GPIO_FUNC_SPI); // TX pin
     gpio_set_function(FW_SPI_CLK, GPIO_FUNC_SPI); // CLK pin
+
+    // set extra data pins high
+    gpio_init(FW_SPI_W_NEN);
+    gpio_set_dir(FW_SPI_W_NEN, GPIO_OUT);
+    gpio_put(FW_SPI_W_NEN, 1);
+
+    gpio_init(FW_SPI_NHOLD);
+    gpio_set_dir(FW_SPI_NHOLD, GPIO_OUT);
+    gpio_put(FW_SPI_NHOLD, 1);
+
 
     // enable CS pin
     gpio_init(FW_SPI_CS);

@@ -36,7 +36,7 @@ int test_basic_flash(int iteration)
     PRINT_TEST(passed, "Erase flash");
 
     passed = 1;
-    xor_fill_buf(test_mem, 256, 0x11223344);
+    xor_fill_buf((void *)test_mem, 256, 0x11223344);
     spi_flash_page_program_blocking(0, test_mem, sizeof(test_mem));
     spi_flash_read(0, test_rdmem, sizeof(test_rdmem));
     if (memcmp(test_mem, test_rdmem, sizeof(test_rdmem))) passed = 0;
@@ -93,7 +93,7 @@ int test_crc(int iteration)
     uint32_t crc = 0;
     for (int i = 0; i < ARR_LEN(crc_results); i++) {
         xor_fill_buf(crc_buf, ARR_LEN(crc_buf), crc_seeds[i]);
-        crc = crc32c(0x00, crc_buf, sizeof(crc_buf));
+        crc = crc32c(0x00, (void *)crc_buf, sizeof(crc_buf));
         if (crc != crc_results[i]) {
             iteration_failed = i;
             break;
