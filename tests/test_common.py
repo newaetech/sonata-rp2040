@@ -71,6 +71,9 @@ PROG_SPI_FLASH=N0\n\
 def copy_sonata_bitstream(sonata_path):
     shutil.copyfile("./sonata.bit", sonata_path + "/sonata.bit")
 
+def copy_firmware(sonata_path):
+    shutil.copyfile("./usb_msc.uf2", sonata_path + "/usb_msc.uf2")
+
 def write_options(sonata_path, string):
     option_file = open(sonata_path + "/OPTIONS.txt", "w")
     option_file.write(string)

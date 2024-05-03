@@ -277,10 +277,15 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                         PRINT_INFO("Finished programming of %lX blocks, CRC = %lX, verifying...", 
                             cur_blk->blockNo, firmware_crc32);
                         uint32_t read_crc = firmware_calc_crc(0x00);
+
+                        #ifdef TESTING_BUILD
+                        PRINT_TEST(read_crc == firmware_crc32, "firmware flash CRC check");
+                        #endif
+
                         if (read_crc != firmware_crc32) {
                             PRINT_ERR("CRC mismatch %lX on flash, %lX prog'd", read_crc, firmware_crc32);
                         } else {
-                            PRINT_INFO("CRC matched")
+                            PRINT_INFO("CRC matched");
                         }
                         break;
                     }
@@ -407,7 +412,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                         if (read_crc != BITSTREAM_CRC32) {
                             PRINT_ERR("CRC mismatch %lX on flash, %lX prog'd", read_crc, BITSTREAM_CRC32);
                         } else {
-                            PRINT_INFO("CRC matched (%lX)", read_crc);
+                            PRINT_INFO("CRC matched", read_crc);
                         }
                         #ifdef TESTING_BUILD
                         PRINT_TEST(read_crc == BITSTREAM_CRC32, "flash CRC check");
@@ -446,11 +451,11 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
             // if config parse fails, set everything back to default
             set_default_config(&CONFIG);
             #ifdef TESTING_BUILD
-            PRINT_TEST(0, "config parse iteration %d");
+            PRINT_TEST(0, "config parse");
             #endif
         } else {
             #ifdef TESTING_BUILD
-            PRINT_TEST(1, "config parse iteration %d");
+            PRINT_TEST(1, "config parse");
             test_config(0);
             #endif
 
