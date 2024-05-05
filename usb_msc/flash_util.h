@@ -35,6 +35,7 @@ void spi_write_extended_addr_reg(uint8_t addr);
 uint8_t spi_read_extended_addr_reg(void);
 int spi_flash_write_enable(void);
 void spi_cs_put(uint8_t val);
+int spi_flash_write_buffer(uint32_t addr, uint8_t *buf, uint32_t len);
 
 
 inline uint32_t sector_alignment(uint32_t addr)

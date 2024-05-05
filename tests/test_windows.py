@@ -1,5 +1,5 @@
 import numpy as np
-from time import sleep
+from time import sleep, perf_counter
 from test_common import *
 import logging
 
@@ -17,9 +17,12 @@ if not sonata_letter:
 
 print("Sonata at " + sonata_letter)
 print("Copying sonata.bit...")
+t0 = perf_counter()
 copy_sonata_bitstream(sonata_letter)
+t1 = perf_counter()
+total = t1 - t0
 
-print ("Done copy. Testing config write and parse...")
+print ("Done copy, took {}. Testing config write and parse...".format(total))
 
 write_all_options(sonata_letter)
 

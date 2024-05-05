@@ -429,3 +429,20 @@ int spi_flash_chip_erase_blocking(void)
     while (spi_flash_is_busy());
     return 0;
 }
+
+/*
+    Writes an arbitrary amount of data to the flash chip
+*/
+int spi_flash_write_buffer(uint32_t addr, uint8_t *buf, uint32_t len)
+{
+    uint32_t bytes_written = 0;
+    int rtn = 0;
+    while (bytes_written < len) {
+        uint32_t next_page = (addr + 256) & ~0xFF;
+        uint16_t to_write = min(next_page - addr, len);
+        if (rtn = spi_flash_page_program_blocking(addr, buf + bytes_written, to_write), rtn) return rtn;
+        addr += to_write;
+        bytes_written += to_write;
+    }
+    return 0;
+}
