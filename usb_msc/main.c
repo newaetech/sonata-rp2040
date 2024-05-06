@@ -21,6 +21,7 @@
 #include "error.h"
 #include "crc32.h"
 #include "tests.h"
+#include "uf2.h"
 
 #define spi_default PICO_DEFAULT_SPI_INSTANCE
 #define FPGA_CONFIG_LED 18
@@ -65,7 +66,8 @@ extern struct config_options CONFIG;
 uint32_t fpga_flash_calc_crc32(uint32_t addr);
 
 uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
-extern uint8_t FLASH_WRITE_BUF[CONST_64k];
+// extern uint8_t FLASH_WRITE_BUF[CONST_64k];
+extern uint8_t TEST_RD_BUF[4096]; //TODO: use the actual #define for this size
 
 int FLASH_BITSTREAM_SELECT = 0;
 uint32_t FLASH_BITSTREAM_OFFSET[] = {0x00, 10 * 1024 * 1024, 10 * 2 * 1024 * 1024};
@@ -148,16 +150,32 @@ uint16_t initial_fat[] = {0xFFF8, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 */
 void check_flash_for_bitstreams(void)
 {
+    bitstream_init_spi(20E6);
     uint32_t bs_len = 0;
     for (int i = 0; i < ARR_LEN(FLASH_BITSTREAM_OFFSET); i++) {
-        spi_flash_read(FLASH_BITSTREAM_OFFSET[i], FLASH_WRITE_BUF, 256);
-        bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
+        spi_flash_read(FLASH_BITSTREAM_OFFSET[i], TEST_RD_BUF, 256);
+        bs_len = get_bitstream_length(TEST_RD_BUF, 256);
         if (bs_len > 0) {
             PRINT_INFO("Bitstream found in slot %d", i);
         }
         else
         {
             PRINT_INFO("No bitstream in slot %d", i);
+        }
+    }
+}
+
+void check_flash_for_firmware(void)
+{
+    firmware_init_spi(20E6);
+    uint32_t bs_len = 0;
+    struct UF2_Block block;
+    for (int i = 0; i < ARR_LEN(FLASH_BITSTREAM_OFFSET); i++) {
+        spi_flash_read(FLASH_BITSTREAM_OFFSET[i], &block, sizeof(block));
+        if (is_uf2_block(&block)) {
+            PRINT_INFO("Firmware found in slot %d", i);
+        } else {
+            PRINT_INFO("No firmware in slot %d", i);
         }
     }
 }
@@ -169,9 +187,10 @@ void check_flash_for_bitstreams(void)
 */
 void startup_program_bitstream(void)
 {
+    bitstream_init_spi(20E6);
     uint32_t bitstream_offset = flash_get_bitstream_offset();
-    spi_flash_read(bitstream_offset, FLASH_WRITE_BUF, 256); // whatever, just duplicate the reads...
-    uint32_t bs_len = get_bitstream_length(FLASH_WRITE_BUF, 256);
+    spi_flash_read(bitstream_offset, TEST_RD_BUF, 256); // whatever, just duplicate the reads...
+    uint32_t bs_len = get_bitstream_length(TEST_RD_BUF, 256);
 
     if (bs_len > 0) {
         // TODO: calc/record CRC
@@ -181,10 +200,10 @@ void startup_program_bitstream(void)
         uint32_t flash_addr = bitstream_offset;
         uint32_t crc = 0x00;
         while (bs_len) {
-            uint32_t read_len = min(sizeof(FLASH_WRITE_BUF), bs_len);
-            spi_flash_read(flash_addr, FLASH_WRITE_BUF, read_len);
-            fpga_program_sendchunk(FLASH_WRITE_BUF, read_len);
-            crc = crc32c(crc, FLASH_WRITE_BUF, read_len);
+            uint32_t read_len = min(sizeof(TEST_RD_BUF), bs_len);
+            spi_flash_read(flash_addr, TEST_RD_BUF, read_len);
+            fpga_program_sendchunk(TEST_RD_BUF, read_len);
+            crc = crc32c(crc, TEST_RD_BUF, read_len);
             bs_len -= read_len;
             flash_addr += read_len;
             PRINT_DEBUG("Prog %lX bytes, %lX left", read_len, bs_len);
@@ -224,6 +243,7 @@ int main()
 
     // check first 256 bytes to see if there's a bitstream in flash
     check_flash_for_bitstreams();
+    check_flash_for_firmware();
 
     PRINT_INFO("Using slot %d", read_bitstream_select_pins());
 

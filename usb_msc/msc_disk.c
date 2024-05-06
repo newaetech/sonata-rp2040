@@ -20,7 +20,7 @@
 #include "tusb_config.h"
 
 
-uint8_t FLASH_WRITE_BUF[CONST_64k];
+// uint8_t FLASH_WRITE_BUF[CONST_64k];
 uint32_t SPI_FLASH_BUF_INDEX = 0;
 
 struct config_options CONFIG = {.dirty = 1, 
@@ -156,6 +156,7 @@ uint32_t BITSTREAM_CRC32 = 0; // running crc32c of bitstream
 uint32_t FIRMWARE_FLASH_ADDR = 0; // current firmware flash offset from start of slot
 uint32_t FIRMWARE_BLOCK_COUNTER = 0; // counter to keep track of when we read a new flash erase sector (every 64kB)
 uint32_t FIRMWARE_CRC32 = 0; // running crc32c of firmware
+uint32_t FIRMWARE_BASE_OFFSET = 0;
 
 /* shared flash globals */
 uint8_t TEST_RD_BUF[CFG_TUD_MSC_EP_BUFSIZE]; // buffer for reading flash data into to verify that writes worked correctly
@@ -219,7 +220,8 @@ int handle_firmware_program(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
     if (!start_blk->blockNo) {
         PRINT_INFO("Starting firmware program of %lX blocks", start_blk->numBlocks);
         FIRMWARE_BLOCK_COUNTER = 0;
-        FIRMWARE_FLASH_ADDR = 0;
+        FIRMWARE_FLASH_ADDR = flash_get_bitstream_offset();
+        FIRMWARE_BASE_OFFSET = FIRMWARE_FLASH_ADDR;
         FIRMWARE_CRC32 = 0;
 
         // NOTE: could set block_counter to >64k to trigger erase
@@ -265,7 +267,7 @@ int handle_firmware_program(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
                 FIRMWARE_FLASH_ADDR = 0;
                 PRINT_INFO("Finished programming of %lX blocks, CRC = %lX, verifying...", 
                     cur_blk->blockNo, FIRMWARE_CRC32);
-                uint32_t read_crc = firmware_calc_crc(0x00);
+                uint32_t read_crc = firmware_calc_crc(FIRMWARE_BASE_OFFSET);
 
                 #ifdef TESTING_BUILD
                 PRINT_TEST(read_crc == FIRMWARE_CRC32, "firmware flash CRC check");
@@ -338,14 +340,13 @@ int handle_bitstream_program(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
             bitstream_init_spi(CONFIG.flash_prog_speed);
 
             // if at the beginning of our buffer, erase 64k of flash
-            // todo just keep track of flash length separate from fpga length
             if (FPGA_FLASH_BLOCK_COUNTER >= 0x10000) {
                 while (spi_flash_is_busy());
                 if (spi_flash_64k_erase_nonblocking(FLASH_CURRENT_OFFSET + FLASH_BASE_OFFSET)) {
                     PRINT_ERR("Erase error @ %lX", FLASH_CURRENT_OFFSET);
                 }
                 // while (spi_flash_is_busy());
-                PRINT_INFO("Erasing %lX", FLASH_CURRENT_OFFSET);
+                PRINT_DEBUG("Erasing %lX", FLASH_CURRENT_OFFSET);
                 FPGA_FLASH_BLOCK_COUNTER = 0;
             }
             while (spi_flash_is_busy());
@@ -355,6 +356,7 @@ int handle_bitstream_program(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
                 PRINT_ERR("BSFL WR err %d @ %lX", err, FLASH_BASE_OFFSET + FLASH_CURRENT_OFFSET);
             }
 
+            // read buffer back and verify
             if (err = spi_flash_read(FLASH_BASE_OFFSET + FLASH_CURRENT_OFFSET, TEST_RD_BUF, bufsize)) {
                 PRINT_ERR("BSFL RD err %d @ %lX", err, FLASH_BASE_OFFSET + FLASH_CURRENT_OFFSET);
             }
