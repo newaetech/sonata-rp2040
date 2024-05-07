@@ -30,6 +30,11 @@ os.sync() #ensure above write finishes
 print("Done. Ejecting drive...")
 sleep(0.25)
 
+print("Copying firmware")
+copy_firmware(sonata_path)
+os.sync()
+
+
 results, full_file = get_test_results(sonata_path)
 intended_failures = (3, 4) # these ones check to make sure invalid 
 any_failures = 0
@@ -38,10 +43,14 @@ for num, result in enumerate(results):
         if result['passed']:
             print("Passed test that should have failed {}".format(str(result)))
             any_failures = 1
+        else:
+            print("Passed test {}".format(str(result['name'])))
     else:
         if not result['passed']:
             print("Failed test {}".format(str(result)))
             any_failures = 1
+        else:
+            print("Passed test {}".format(str(result['name'])))
 
 with open('LOG.txt', "w") as f:
     f.write(str(full_file))
