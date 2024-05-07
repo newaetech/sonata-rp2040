@@ -12,12 +12,14 @@ def get_sonata_path():
     result = subprocess.run(['blkid', '-l', '-o', 'device', '-t', 
                              'LABEL=SONATA', '-c', '/dev/null'],
                              capture_output=True)
-    mnt = result.stdout().decode().strip()
+    mnt = result.stdout.decode().strip()
     result = subprocess.run(['findmnt', mnt, '-no', 'TARGET'], capture_output=True)
-    return result.stdout().decode().strip()
+    return result.stdout.decode().strip()
 
 
-sonata_path = "../../sonata" #TODO: make this better
+#sonata_path = "../../sonata" #TODO: make this better
+sonata_path = get_sonata_path()
+os.sync()
 print("Copying sonata.bit...")
 copy_sonata_bitstream(sonata_path)
 os.sync() #ensure above write finishes
@@ -52,7 +54,7 @@ for num, result in enumerate(results):
         else:
             print("Passed test {}".format(str(result['name'])))
 
-with open('LOG.txt', "w") as f:
+with open('LOG.TXT', "w") as f:
     f.write(str(full_file))
 
 if not any_failures:

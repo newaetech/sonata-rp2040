@@ -75,10 +75,11 @@ def copy_firmware(sonata_path):
     shutil.copyfile("./usb_msc.uf2", sonata_path + "/usb_msc.uf2")
 
 def write_options(sonata_path, string):
-    option_file = open(sonata_path + "/OPTIONS.txt", "w")
+    option_file = open(sonata_path + "/OPTIONS.TXT", "w")
     option_file.write(string)
     logging.debug("Writing")
     logging.debug(string)
+    option_file.flush() # shouldn't be necessary
     option_file.close()
 
 def write_all_options(sonata_path):
@@ -91,7 +92,7 @@ def write_all_options(sonata_path):
 
 def get_test_results(sonata_path):
     results = []
-    option_file = open(sonata_path + "/LOG.txt", "r")
+    option_file = open(sonata_path + "/LOG.TXT", "r")
     string = option_file.read()
     option_file.close()
 
