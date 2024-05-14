@@ -1,5 +1,35 @@
 # RP2040 Firmware for Sonata Board
 
+## Usage
+
+### Copying Bitstreams/Firmware
+
+Once plugged in, the Sonata board should enumerate as a USB mass storage device. Bitstreams
+and Sonata firmware can both be programmed by copying their respective files to the mass
+storage device. By default, bitstreams will be programmed into both flash memory
+and the FPGA, while firmware will be programmed into flash memory. Note that
+Sonata firmware must be in UF2 format to be detected and programmed into flash.
+
+### Flash Slots
+
+Bitstream and firmware both have 3 flash slots, which can be selected via the 3 position
+Bitstream select switch by the USB port on the device. This controls both where
+bitstream/firmware are written to when programming, as well as where bitstreams
+are loaded from on device boot.
+
+### Logging/Options
+
+Important things such as firmware version, which slots have bitstreams/firmware, etc.
+is logged in LOG.TXT. Various options, such as programming speed and whether or not
+to write bitstreams to flash can be modified in OPTIONS.TXT.
+
+### Reprogramming/Updating Sonata
+
+The Sonata's firmware can be erased by holding down SW9 while plugging in the USB, after
+which the board should enumerate as a different USB mass storage device. New firmware is 
+avilable in UF2 format and can be programmed by copying the UF2 file into the drive, similar
+to how bitstream and firmware programming works on the Sonata board.
+
 ## Getting started
 
 ### Linux Setup
@@ -30,6 +60,18 @@ cd build
 PICO_SDK_PATH=/path-to/pico-sdk cmake ..
 make # or ninja if on Windows
 ```
+## Logging
+
+Different logging levels are available and can be selected with `-DDEBUG_LEVEL=N` where `N` is
+between 1 and 5. The levels available are:
+
+1. Critical
+1. Error
+1. Warning
+1. Info
+1. Debug
+
+with Info (4) being the default.
 
 ## Debugging
 
@@ -49,6 +91,13 @@ Start GDB from the `build` directory:
 cd build
 arm-none-eabi-gdb usb_msc/usb_msc.elf -ex "target extended-remote localhost:3333" -ex "load" -ex "monitor reset init"
 ```
+
+## Testing
+
+Some basic tests can be run by creating testing firmware with cmake: `-DTESTING_BUILD=ON`,
+then running either `tests/test_linux.py` or `tests/test_windows.py`, depending on your platform.
+
+Tests should be run after a fresh boot and nothing should be uploaded to the Sonata before running the tests.
 
 ## Notes
 
