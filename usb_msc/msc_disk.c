@@ -208,6 +208,8 @@ uint32_t fpga_flash_calc_crc32(uint32_t addr)
     return crc;
 }
 
+void startup_program_bitstream(void); // only here because of below hack to stop FPGA from messing with flash
+
 /*
     Handle the case where we get a UF2 block
 */
@@ -215,6 +217,9 @@ int handle_firmware_program(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
 {
     firmware_init_spi(CONFIG.flash_prog_speed);
     struct UF2_Block *start_blk = (struct UF2_Block *)(buffer);
+
+    // NOTE: Something the FPGA is doing seems to be messing up FW flash, so for now erase and reprogram the FPGA after this
+    fpga_erase();
 
     // If this is the first block of firmware, reset all addr stuff to 0
     if (!start_blk->blockNo) {
@@ -278,6 +283,8 @@ int handle_firmware_program(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
                 } else {
                     PRINT_INFO("CRC matched");
                 }
+                release_spi_io(); // release SPI IO so that FPGA runs again
+                startup_program_bitstream();
                 break;
             }
         }
@@ -398,6 +405,7 @@ int handle_bitstream_program(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
             #ifdef TESTING_BUILD
             test_done_program(0);
             #endif
+            // release_spi_io(); // release SPI IO so that FPGA runs again
         }
     }
     return 0;
@@ -445,12 +453,10 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
 
     if (!known_file) {
-        // TODO func this
         // TODO add programming of different flash slots
         if (is_uf2_block((void *)buffer)) {
             handle_firmware_program(lba, buffer, bufsize);
         } else {
-            // TODO func this
             handle_bitstream_program(lba, buffer, bufsize);
         }
     }

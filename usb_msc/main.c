@@ -163,11 +163,13 @@ void check_flash_for_bitstreams(void)
             PRINT_INFO("No bitstream in slot %d", i);
         }
     }
+    // release_spi_io();
 }
 
 void check_flash_for_firmware(void)
 {
     firmware_init_spi(20E6);
+    fpga_erase();
     uint32_t bs_len = 0;
     struct UF2_Block block;
     for (int i = 0; i < ARR_LEN(FLASH_BITSTREAM_OFFSET); i++) {
@@ -178,6 +180,7 @@ void check_flash_for_firmware(void)
             PRINT_INFO("No firmware in slot %d", i);
         }
     }
+    release_spi_io();
 }
 
 /*
@@ -206,12 +209,13 @@ void startup_program_bitstream(void)
             crc = crc32c(crc, TEST_RD_BUF, read_len);
             bs_len -= read_len;
             flash_addr += read_len;
-            PRINT_DEBUG("Prog %lX bytes, %lX left", read_len, bs_len);
+            // PRINT_DEBUG("Prog %lX bytes, %lX left", read_len, bs_len);
         }
         PRINT_INFO("Finished programming CRC=%lX", crc);
     } else {
         PRINT_INFO("No bitstream in flash @ %lX", bitstream_offset);
     }
+    // release_spi_io();
 }
 
 int main()
@@ -220,6 +224,10 @@ int main()
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     setup_bitstream_select_pin();
+    fpga_setup_nrst_preq();
+
+    fpga_program_init(5E6);
+    fpga_erase();
 
     // Setup LEDs
     for (uint8_t i = 0; i < ARR_LEN(USER_LEDS); i++) {
@@ -230,7 +238,7 @@ int main()
     board_init();
     tud_init(BOARD_TUD_RHPORT);
 
-    bitstream_init_spi(20E6);
+    // bitstream_init_spi(20E6);
 #ifdef TESTING_BUILD
     test_crc(0);
 // this stops USB from working for some reason...

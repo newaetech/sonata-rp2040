@@ -126,12 +126,13 @@ void bitstream_init_spi(uint32_t baud)
     spi_deinit(flash_spi);
     spi_init(flash_spi, baud);
 
-    // disable FW_SPI pins
-    gpio_set_function(FW_SPI_DI , GPIO_FUNC_NULL);
-    gpio_set_function(FW_SPI_DO , GPIO_FUNC_NULL);
-    gpio_set_function(FW_SPI_CLK, GPIO_FUNC_NULL);
+    release_spi_io();
 
     // enable BS_SPI pins
+    gpio_init(BS_SPI_DI); // RX pin
+    gpio_init(BS_SPI_DO); // TX pin
+    gpio_init(BS_SPI_CLK); // CLK pin
+
     gpio_set_function(BS_SPI_DI, GPIO_FUNC_SPI); // RX pin
     gpio_set_function(BS_SPI_DO, GPIO_FUNC_SPI); // TX pin
     gpio_set_function(BS_SPI_CLK, GPIO_FUNC_SPI); // CLK pin
@@ -153,12 +154,16 @@ void firmware_init_spi(uint32_t baud)
     spi_deinit(flash_spi);
     spi_init(flash_spi, baud);
 
-    // disable BS_SPI pins
-    gpio_set_function(BS_SPI_DI , GPIO_FUNC_NULL);
-    gpio_set_function(BS_SPI_DO , GPIO_FUNC_NULL);
-    gpio_set_function(BS_SPI_CLK, GPIO_FUNC_NULL);
+    release_spi_io();
+
+    fpga_set_sw_nrst(0); // hold FPGA software in reset
+    fpga_set_io_tristate(1); // tristate FPGA pins
 
     // enable FW_SPI pins
+    gpio_init(FW_SPI_DI); // RX pin
+    gpio_init(FW_SPI_DO); // TX pin
+    gpio_init(FW_SPI_CLK); // CLK pin
+
     gpio_set_function(FW_SPI_DI, GPIO_FUNC_SPI); // RX pin
     gpio_set_function(FW_SPI_DO, GPIO_FUNC_SPI); // TX pin
     gpio_set_function(FW_SPI_CLK, GPIO_FUNC_SPI); // CLK pin
@@ -178,6 +183,32 @@ void firmware_init_spi(uint32_t baud)
     gpio_set_dir(FW_SPI_CS, GPIO_OUT);
     gpio_put(FW_SPI_CS, 1);
     SPI_FLASH_CS_PIN = FW_SPI_CS;
+
+    // hold FPGA in reset and tristate its IO pins
+
+}
+
+void release_spi_io(void)
+{
+    // spi_deinit(flash_spi);
+
+    // disable BS_SPI pins
+    gpio_set_function(BS_SPI_DI , GPIO_FUNC_NULL);
+    gpio_set_function(BS_SPI_DO , GPIO_FUNC_NULL);
+    gpio_set_function(BS_SPI_CLK, GPIO_FUNC_NULL);
+
+    // // disable FW_SPI pins
+    gpio_set_function(FW_SPI_DI , GPIO_FUNC_NULL);
+    gpio_set_function(FW_SPI_DO , GPIO_FUNC_NULL);
+    gpio_set_function(FW_SPI_CLK, GPIO_FUNC_NULL);
+
+    gpio_set_function(FW_SPI_CS, GPIO_FUNC_NULL);
+    gpio_set_function(FW_SPI_NHOLD, GPIO_FUNC_NULL);
+    gpio_set_function(FW_SPI_W_NEN, GPIO_FUNC_NULL);
+    gpio_set_function(BS_SPI_CS, GPIO_FUNC_NULL);
+
+    fpga_set_sw_nrst(1); // release SW reset
+    fpga_set_io_tristate(0); // untristate pins
 }
 
 /*

@@ -71,7 +71,7 @@ between 1 and 5. The levels available are:
 1. Info
 1. Debug
 
-with Info (4) being the default.
+with Info (4) being the default. Logs are written to `LOG.txt`.
 
 ## Debugging
 
