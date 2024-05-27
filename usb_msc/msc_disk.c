@@ -225,7 +225,8 @@ int handle_firmware_program(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
     if (!start_blk->blockNo) {
         PRINT_INFO("Starting firmware program of %lX blocks", start_blk->numBlocks);
         FIRMWARE_BLOCK_COUNTER = 0;
-        FIRMWARE_FLASH_ADDR = flash_get_bitstream_offset();
+        // FIRMWARE_FLASH_ADDR = flash_get_bitstream_offset();
+        FIRMWARE_FLASH_ADDR = 0; // NOTE: sonata bitstream only checks 0x00 for now, so only prog that
         FIRMWARE_BASE_OFFSET = FIRMWARE_FLASH_ADDR;
         FIRMWARE_CRC32 = 0;
 
