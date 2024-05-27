@@ -236,7 +236,6 @@ int main()
     }
 
     board_init();
-    tud_init(BOARD_TUD_RHPORT);
 
     // bitstream_init_spi(20E6);
 #ifdef TESTING_BUILD
@@ -271,6 +270,8 @@ int main()
         set_default_config(&CONFIG);
         int i = fat_strlen(get_filesystem()->root_dir[0].filename);
     }
+
+    tud_init(BOARD_TUD_RHPORT);
 
     while (true) {
         tud_task(); // tinyusb device task
