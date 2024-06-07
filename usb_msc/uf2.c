@@ -36,3 +36,16 @@ int uf2_is_last_block(struct UF2_Block *block)
     if (block->blockNo >= (block->numBlocks - 1)) return 1;
     return 0;
 }
+
+/*
+    Calculate the maximum file size, assuming this block contains the maximum number of bytes in a block
+*/
+uint32_t uf2_get_filesize(struct UF2_Block *blk)
+{
+    return (blk->payloadSize * blk->numBlocks);
+}
+
+int block_is_bitstream(struct UF2_Block *blk)
+{
+
+}

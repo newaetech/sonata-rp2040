@@ -13,6 +13,9 @@ enum uf2_flags {
 #define UF2_MAGIC_START_1 0x9E5D5157
 #define UF2_MAGIC_END 0xAB16F30
 
+#define SONATA_BITSTREAM_ID 0x6CE29E60
+#define SONATA_FIRMWARE_ID 0x6CE29E6B
+
 #pragma pack(push, 1)
 struct UF2_Block {
     // 32 byte header
@@ -38,3 +41,4 @@ struct extension_tag {
 int is_uf2_block(struct UF2_Block *block);
 int uf2_get_sha(struct UF2_Block *block, struct extension_tag *sha);
 int uf2_is_last_block(struct UF2_Block *block);
+uint32_t uf2_get_filesize(struct UF2_Block *blk);
