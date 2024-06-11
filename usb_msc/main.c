@@ -212,6 +212,11 @@ void startup_program_bitstream(void)
             // PRINT_DEBUG("Prog %lX bytes, %lX left", read_len, bs_len);
         }
         PRINT_INFO("Finished programming CRC=%lX", crc);
+        if (FPGA_ISDONE()) {
+            PRINT_INFO("Bitstream prog success");
+        } else {
+            PRINT_INFO("Bitstream prog fail");
+        }
     } else {
         PRINT_INFO("No bitstream in flash @ %lX", bitstream_offset);
     }

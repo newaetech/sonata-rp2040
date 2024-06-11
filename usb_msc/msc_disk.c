@@ -426,6 +426,7 @@ struct flash_prog_state {
 
 struct flash_prog_state BITSTREAM_STATE = {}, FIRMWARE_STATE = {};
 
+#define BITSTREAM_FIRMWARE_STRING (state->is_bitstream ? "BITSTREAM" : "FIRMWARE")
 int flash_program_uf2(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
 {
     for (uint32_t i = 0; i < bufsize; i += 512) {
@@ -460,6 +461,14 @@ int flash_program_uf2(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
                 state->crc = 0;
                 state->block_size = cur_blk->payloadSize;
 
+                /*
+                    NOTE: Something the FPGA is doing seems to be messing up FW flash, 
+                    so for now erase and reprogram the FPGA after this
+                */
+                fpga_erase();
+
+                PRINT_INFO("Programming %u %.10s blocks", state->blocks_left, BITSTREAM_FIRMWARE_STRING);
+
                 if (state->is_bitstream) {
                     state->offset = flash_get_bitstream_offset();
                 }
@@ -470,13 +479,9 @@ int flash_program_uf2(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
                 uint32_t num_bytes = uf2_get_filesize(cur_blk);
                 for (uint32_t j = 0; j < num_bytes; j += CONST_64k) {
                     spi_flash_64k_erase_nonblocking(j + state->offset);
+                    // PRINT_INFO("Erasing %lX", j + state->offset);
                     while (spi_flash_is_busy());
                 }
-                /*
-                    NOTE: Something the FPGA is doing seems to be messing up FW flash, 
-                    so for now erase and reprogram the FPGA after this
-                */
-                fpga_erase();
             }
 
             /*
@@ -487,13 +492,15 @@ int flash_program_uf2(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
                 PRINT_ERR("FW prog err @ %lX", addr);
             }
             
-            state->crc = crc32c(state->crc, cur_blk->data, cur_blk->payloadSize);
+            // NOTE: can't do CRC since data can be out of order
+            // state->crc = crc32c(state->crc, cur_blk->data, cur_blk->payloadSize);
 
             spi_flash_read(addr, TEST_RD_BUF, cur_blk->payloadSize);
 
-            if (memcmp(cur_blk, TEST_RD_BUF, cur_blk->payloadSize)) {
+            if (memcmp(cur_blk->data, TEST_RD_BUF, cur_blk->payloadSize)) {
                 PRINT_ERR("Verify error @ %lX", addr);
             }
+            state->blocks_left--;
 
             /*
                 if this is the last block, calc the crc of what's in flash,
@@ -502,19 +509,20 @@ int flash_program_uf2(uint32_t lba, uint8_t *buffer, uint32_t bufsize)
             if (state->blocks_left == 0) {
                 state->in_progress = 0;
                 uint32_t read_crc = 0;
-                if (state->is_bitstream) {
-                    read_crc = fpga_flash_calc_crc32(state->offset);
-                } else {
+
+                // note: will have to disable this as data may be written out of order
+                if (!state->is_bitstream) {
                     read_crc = firmware_calc_crc(state->offset);
+                    PRINT_INFO("%.10s prog fin crc=%lX", BITSTREAM_FIRMWARE_STRING, read_crc);
                 }
 
-                if (read_crc != state->crc) {
-                    PRINT_ERR("%10s programming failed, crc mismatch (%lX != %lX)", state->is_bitstream ? 
-                                                                            "BITSTREAM" : "FIRMWARE",
-                                                                            read_crc, state->crc);
-                } else {
-                    PRINT_INFO("%10s programming succeeded", state->is_bitstream ? "BITSTREAM" : "FIRMWARE");
-                }
+                // if (read_crc != state->crc) {
+                //     PRINT_ERR("%10s programming failed, crc mismatch (%lX != %lX)", state->is_bitstream ? 
+                //                                                             "BITSTREAM" : "FIRMWARE",
+                //                                                             read_crc, state->crc);
+                // } else {
+                //     PRINT_INFO("%10s programming succeeded", state->is_bitstream ? "BITSTREAM" : "FIRMWARE");
+                // }
                 
                 release_spi_io(); // release SPI IO so that FPGA runs again
                 startup_program_bitstream(); // reprogram the fpga
