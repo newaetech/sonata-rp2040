@@ -50,7 +50,7 @@ extern struct directory_entry err_file_entry;
 
 #ifdef TESTING_BUILD
     extern volatile uint32_t TESTING_COUNTER;
-    #define PRINT_TEST(PASSED, FMT, ...) print_err_file(get_filesystem(), "TEST %lu %4s: " FMT "\r\n", TESTING_COUNTER++, PASSED ? "PASS" : "FAIL", ##__VA_ARGS__)
+    #define PRINT_TEST(PASSED, NAME, FMT, ...) print_err_file(get_filesystem(), "TEST %.10s %4s " FMT "\r\n", NAME, PASSED ? "PASS" : "FAIL", ##__VA_ARGS__)
 #else
-    #define PRINT_TEST(PASSED, FMT, ...)
+    #define PRINT_TEST(PASSED, NAME, FMT, ...)
 #endif

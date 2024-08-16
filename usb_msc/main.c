@@ -22,6 +22,7 @@
 #include "crc32.h"
 #include "tests.h"
 #include "uf2.h"
+#include "elf.h"
 
 #define spi_default PICO_DEFAULT_SPI_INSTANCE
 #define FPGA_CONFIG_LED 18
@@ -113,7 +114,7 @@ static uint8_t test_mem[256];
 void xor_fill_buf(uint32_t *buf, int len, uint32_t seed);
 
 /*
-Erase/read/write for first 256 bytes of flash
+    Erase/read/write for first 256 bytes of flash
 */
 int test_fw_flash(void)
 {
@@ -166,15 +167,22 @@ void check_flash_for_bitstreams(void)
     // release_spi_io();
 }
 
+/*
+    Check first 256 bytes of each flash slot for elf header
+
+    Print result to LOG.txt
+*/
 void check_flash_for_firmware(void)
 {
     firmware_init_spi(20E6);
     fpga_erase();
     uint32_t bs_len = 0;
-    struct UF2_Block block;
+    // struct UF2_Block block;
+    struct elf_header32 hdr;
     for (int i = 0; i < ARR_LEN(FLASH_BITSTREAM_OFFSET); i++) {
-        spi_flash_read(FLASH_BITSTREAM_OFFSET[i], &block, sizeof(block));
-        if (is_uf2_block(&block)) {
+        spi_flash_read(FLASH_BITSTREAM_OFFSET[i], &hdr, sizeof(hdr));
+        // if (is_uf2_block(&block)) {
+        if (is_elf(&hdr)) {
             PRINT_INFO("Firmware found in slot %d", i);
         } else {
             PRINT_INFO("No firmware in slot %d", i);

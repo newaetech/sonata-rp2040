@@ -13,11 +13,11 @@ enum uf2_flags {
 #define UF2_MAGIC_START_1 0x9E5D5157
 #define UF2_MAGIC_END 0xAB16F30
 
-// #define SONATA_BITSTREAM_ID 0x6CE29E60
-// #define SONATA_FIRMWARE_ID 0x6CE29E6B
+#define SONATA_BITSTREAM_ID 0x6CE29E60
+#define SONATA_FIRMWARE_ID 0x6CE29E6B
 // note: endianness is reverse of what's in file
-#define SONATA_BITSTREAM_ID 0x4240BDE
-#define SONATA_FIRMWARE_ID 0x6CE29E60
+// #define SONATA_BITSTREAM_ID 0x4240BDE
+// #define SONATA_FIRMWARE_ID 0x6CE29E60
 
 #pragma pack(push, 1)
 struct UF2_Block {

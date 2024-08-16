@@ -1,11 +1,12 @@
 #include "tests.h"
 #include "stdint.h"
-#include "error.h"
 #include "util.h"
 #include "crc32.h"
 #include "config.h"
 #include "fpga_program.h"
 #include "flash_util.h"
+#include "error.h"
+
 extern struct config_options CONFIG;
 static uint8_t test_rdmem[256];
 static uint8_t test_mem[256];
@@ -18,7 +19,7 @@ void xor_fill_buf(uint32_t *buf, int len, uint32_t seed);
 
 int test_done_program(int iteration)
 {
-    PRINT_TEST(FPGA_ISDONE(), "FPGA Done Pin");
+    PRINT_TEST(FPGA_ISDONE(), FPGA_DONE_TEST_NAME, "");
     return 0;
 }
 
@@ -33,14 +34,14 @@ int test_basic_flash(int iteration)
             passed = 0;
         }
     }
-    PRINT_TEST(passed, "Erase flash");
+    PRINT_TEST(passed, ERASE_TEST_NAME, "");
 
     passed = 1;
     xor_fill_buf((void *)test_mem, 256, 0x11223344);
     spi_flash_page_program_blocking(0, test_mem, sizeof(test_mem));
     spi_flash_read(0, test_rdmem, sizeof(test_rdmem));
     if (memcmp(test_mem, test_rdmem, sizeof(test_rdmem))) passed = 0;
-    PRINT_TEST(passed, "Program flash");
+    PRINT_TEST(passed, PROGRAM_TEST_NAME, "");
     return 0;
 }
 
@@ -57,7 +58,7 @@ int test_config(int iteration)
         .prog_flash = false,
         .dirty = false
     };
-    PRINT_TEST(!memcmp(&comp, &CONFIG, sizeof(comp)), "Match config");
+    PRINT_TEST(!memcmp(&comp, &CONFIG, sizeof(comp)), MATCH_CONF_TEST_NAME, "");
     return 0;
 }
 
@@ -101,9 +102,11 @@ int test_crc(int iteration)
     }
 
     if (iteration_failed >= 0) {
-        PRINT_TEST(0, "CRC test failed on iteration %d, got %lX expected %lX", iteration_failed, crc, crc_results[iteration_failed]);
+        PRINT_TEST(0, CRC_TEST_NAME ,"failed on iteration %d, got %lX expected %lX", iteration_failed, crc, crc_results[iteration_failed]);
     } else {
-        PRINT_TEST(1, "CRC test");
+        PRINT_TEST(1, CRC_TEST_NAME, "");
     }
     return 0;
 }
+
+    #define PRINT_TEST(PASSED, NAME, FMT, ...) print_err_file(get_filesystem(), "TEST %.10s %4s: " FMT "\r\n", PASSED ? "PASS" : "FAIL", ##__VA_ARGS__)

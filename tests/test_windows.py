@@ -6,16 +6,22 @@ import logging
 # shutil.copyfile("")
 # logging.getLogger().setLevel(logging.DEBUG)
 # ps_run("./eject.ps1")
+
+test_names = get_test_names()
+
 logging.basicConfig(filename="log.txt", level=logging.DEBUG, filemode='w', 
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',)
 sonata_letter = get_windows_drive_letter()
+
 
 if not sonata_letter:
     print("Sonata drive not found")
     exit(1)
 
 print("Sonata at " + sonata_letter)
+print("Clearing log file...")
+clear_log_file(sonata_letter)
 print("Copying sonata.bit...")
 t0 = perf_counter()
 copy_sonata_bitstream(sonata_letter)

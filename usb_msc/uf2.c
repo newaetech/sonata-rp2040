@@ -44,8 +44,3 @@ uint32_t uf2_get_filesize(struct UF2_Block *blk)
 {
     return (blk->payloadSize * blk->numBlocks);
 }
-
-int block_is_bitstream(struct UF2_Block *blk)
-{
-
-}

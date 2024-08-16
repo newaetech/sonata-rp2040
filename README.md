@@ -6,9 +6,12 @@
 
 Once plugged in, the Sonata board should enumerate as a USB mass storage device. Bitstreams
 and Sonata firmware can both be programmed by copying their respective files to the mass
-storage device. By default, bitstreams will be programmed into both flash memory
-and the FPGA, while firmware will be programmed into flash memory. Note that
-Sonata firmware must be in UF2 format to be detected and programmed into flash.
+storage device. Bitstreams and firmware must be in UF2 format with a maximum block size
+of 256 bytes and device IDs of `0x6ce29e6b` and `0x6ce29e60`, respectively. Only the data
+portion of the UF2 block is written to flash.
+
+Note that the FPGA is currently erased during both firmware and bitstream programming,
+then reprogrammed afterwards.
 
 ### Flash Slots
 
