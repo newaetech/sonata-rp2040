@@ -18,8 +18,7 @@ int print_err_file(struct fat_filesystem *fs, const char *fmt, ...)
     if (err) return -1;
 
     uint16_t file_cluster = LE_2U8_TO_U16(err_file_entry.starting_cluster);
-    err_file_size = LE_4U8_TO_U32(err_file_entry.file_size);
-    if ((err_file_size >= DISK_CLUSTER_SIZE) || (file_cluster < 2)) return -1;
+    if ((err_file_size >= ERR_FILE_SIZE) || (file_cluster < 2)) return -1;
 
     uint32_t space_left = ERR_FILE_SIZE - err_file_size;
 

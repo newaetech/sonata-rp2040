@@ -396,7 +396,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     //     memset(buffer + 10, 0xFF, sizeof(bad_seq));
     // }
     memcpy(addr, buffer, bufsize);
-    // write_file_info(fs, 0, "LOG", &err_file_entry); // make sure PC doesn't overwrite our err file info
+    write_file_info(fs, 0, "LOG", &err_file_entry); // make sure PC doesn't overwrite our err file info
 
 
     /* 
