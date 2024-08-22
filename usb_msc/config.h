@@ -1,7 +1,7 @@
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
-#include <fat_util.h>
+#include "fat_util.h"
 
 enum config_defaults {
     CONF_DEFAULT_FPGA_PROG_SPEED = (int)20E6,

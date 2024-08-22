@@ -10,6 +10,33 @@
 // GPIO11 = FPGA Data
 // data pin can be 11, 15, 27
 #define FPGA_CONFIG_LED 18
+#define FPGA_NRST_PIN 17
+#define FPGA_PREQ_PIN 6
+
+void fpga_setup_nrst_preq(void)
+{
+    gpio_init(FPGA_NRST_PIN);
+    gpio_init(FPGA_PREQ_PIN);
+    gpio_set_dir(FPGA_PREQ_PIN, GPIO_OUT);
+    fpga_set_io_tristate(0);
+}
+
+// if state == 0, nrst = 0, otherwise nrst = high_z
+void fpga_set_sw_nrst(int state)
+{
+    if (state) {
+        gpio_set_dir(FPGA_NRST_PIN, GPIO_IN);
+    } else {
+        gpio_set_dir(FPGA_NRST_PIN, GPIO_OUT);
+        gpio_put(FPGA_NRST_PIN, 0);
+    }
+}
+
+// set to 1 to tristate FPGA IO
+void fpga_set_io_tristate(int state)
+{
+    gpio_put(FPGA_PREQ_PIN, state);
+}
 
 void fpga_program_sendbyte(uint8_t databyte)
 {

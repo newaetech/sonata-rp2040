@@ -25,6 +25,10 @@ def xor_fill_buf(buf, seed):
 
     return buf
 
+def clear_log_file(sonata_path):
+    with open(sonata_path + "/LOG.TXT", "w") as f:
+        f.close()
+
 def get_windows_drive_letter():
     import wmi
     sonata_letter = None
@@ -69,13 +73,17 @@ PROG_SPI_FLASH=N0\n\
 "
 
 def copy_sonata_bitstream(sonata_path):
-    shutil.copyfile("./sonata.bit", sonata_path + "/sonata.bit")
+    shutil.copyfile("./bitstream.bit.uf2", sonata_path + "/bs.uf2")
+
+def copy_firmware(sonata_path):
+    shutil.copyfile("./firmware.elf.uf2", sonata_path + "/fw.uf2")
 
 def write_options(sonata_path, string):
-    option_file = open(sonata_path + "/OPTIONS.txt", "w")
+    option_file = open(sonata_path + "/OPTIONS.TXT", "w")
     option_file.write(string)
     logging.debug("Writing")
     logging.debug(string)
+    option_file.flush() # shouldn't be necessary
     option_file.close()
 
 def write_all_options(sonata_path):
@@ -88,7 +96,7 @@ def write_all_options(sonata_path):
 
 def get_test_results(sonata_path):
     results = []
-    option_file = open(sonata_path + "/LOG.txt", "r")
+    option_file = open(sonata_path + "/LOG.TXT", "r")
     string = option_file.read()
     option_file.close()
 
@@ -112,3 +120,13 @@ def test_passed(test_string):
 def get_test_name(test_string):
     strs = test_string.split(':')
     return strs[-1]
+
+def get_test_names():
+    names = []
+    with open("../usb_msc/test_names.h") as name_file:
+        data = name_file.read()
+        for line in data.split('\n'):
+            if "#define" in line:
+                name = line.split(" ")[-1]
+                print(name)
+        pass

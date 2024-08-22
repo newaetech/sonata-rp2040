@@ -17,5 +17,5 @@
 #define ARR_LEN(X) ((sizeof(X)) / (sizeof(X[0])))
 
 #define FW_MAJOR_VER 0
-#define FW_MINOR_VER 1
-#define FW_DEBUG_VER 2
+#define FW_MINOR_VER 4
+#define FW_DEBUG_VER 0

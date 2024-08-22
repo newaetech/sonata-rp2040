@@ -30,6 +30,7 @@ if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
     add_compile_options(-Wno-pointer-sign)
     add_compile_options(-Wno-discarded-qualifiers)
     add_compile_options(-Wno-missing-braces)
+    add_compile_options(-Wno-unused-variable)
 endif()
 
 # Hardware-specific examples in subdirectories:
