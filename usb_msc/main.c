@@ -27,6 +27,8 @@
 #define spi_default PICO_DEFAULT_SPI_INSTANCE
 #define FPGA_CONFIG_LED 18
 
+#define MS_DELAY_ON_REPROG 1000
+
 #define STATEA_LED 26
 #define STATEB_LED 25
 
@@ -38,6 +40,15 @@ uint8_t BITSTREAM_SELECT_PINS[] = {29, 28, 27};
 #define STR(X) #X
 #pragma message "TEST_DEBUG_LEVEL = " XSTR(DEBUG_LEVEL)
 #endif
+struct bitstream_selector_state {
+    uint8_t last_position;
+    uint8_t current_position;
+    uint8_t progd_bitstream;
+    uint8_t reprog_bitstream;
+    uint32_t ms_at_switch;
+};
+
+struct bitstream_selector_state BS_SELECT_STATE = {0};
 
 // TODO
 // #define ERR_LED 26
@@ -200,6 +211,7 @@ void startup_program_bitstream(void)
 {
     bitstream_init_spi(20E6);
     uint32_t bitstream_offset = flash_get_bitstream_offset();
+    int slot = read_bitstream_select_pins();
     spi_flash_read(bitstream_offset, TEST_RD_BUF, 256); // whatever, just duplicate the reads...
     uint32_t bs_len = get_bitstream_length(TEST_RD_BUF, 256);
 
@@ -222,6 +234,8 @@ void startup_program_bitstream(void)
         PRINT_INFO("Finished programming CRC=%lX", crc);
         if (FPGA_ISDONE()) {
             PRINT_INFO("Bitstream prog success");
+            BS_SELECT_STATE.progd_bitstream = slot;
+            BS_SELECT_STATE.last_position = slot;
         } else {
             PRINT_INFO("Bitstream prog fail");
         }
@@ -231,9 +245,12 @@ void startup_program_bitstream(void)
     // release_spi_io();
 }
 
+
 int main()
 {
     const uint LED_PIN = 24; // LED1
+    int bitstream_selector_switched = 0;
+
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     setup_bitstream_select_pin();
@@ -268,6 +285,8 @@ int main()
     PRINT_INFO("Using slot %d", read_bitstream_select_pins());
 
     startup_program_bitstream();
+    BS_SELECT_STATE.current_position = read_bitstream_select_pins();
+    BS_SELECT_STATE.last_position = BS_SELECT_STATE.current_position;
 
     gpio_init(FPGA_CONFIG_LED);
     gpio_set_dir(FPGA_CONFIG_LED, GPIO_OUT);
@@ -290,12 +309,29 @@ int main()
         tud_task(); // tinyusb device task
         led_blinking_task();
 
-        // Light up LED associated with selected flash slot
+        BS_SELECT_STATE.current_position = read_bitstream_select_pins();
+
+
+        if (BS_SELECT_STATE.reprog_bitstream) {
+            if (board_millis() - BS_SELECT_STATE.ms_at_switch > MS_DELAY_ON_REPROG) {
+                startup_program_bitstream();
+                BS_SELECT_STATE.reprog_bitstream = 0;
+                // BS_SELECT_STATE.last_position = read_bitstream_select_pins();
+            }
+        } else {
+            if (BS_SELECT_STATE.current_position != BS_SELECT_STATE.last_position) {
+                BS_SELECT_STATE.ms_at_switch = board_millis();
+                BS_SELECT_STATE.reprog_bitstream = 1;
+                BS_SELECT_STATE.progd_bitstream = 0xFF; // turn all LEDs off
+            }
+        }
+
+        // Light up LED associated with programmed flash slot
         for (uint8_t i = 0; i < ARR_LEN(USER_LEDS); i++) {
-            if (!gpio_get(BITSTREAM_SELECT_PINS[i]))
-                gpio_put(USER_LEDS[i], 0);
-            else
+            if (i != BS_SELECT_STATE.progd_bitstream)
                 gpio_put(USER_LEDS[i], 1);
+            else
+                gpio_put(USER_LEDS[i], 0);
         }
 
         // Light up LED FPGA Config LED if FPGA done pin is high
